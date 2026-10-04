@@ -18,5 +18,6 @@ public record BusinessDashboardDTO(
         Integer toleranceMinutes,
         List<QueueEntryResponseDTO> activeQueue,
         List<TeamMemberDTO> team,
-        List<TeamInviteResponseDTO> pendingInvites
+        List<TeamInviteResponseDTO> pendingInvites,
+        boolean emailVerified
 ) {}

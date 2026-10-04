@@ -49,7 +49,8 @@ public class DashboardService {
             return new BusinessDashboardDTO(
                     null, null, null, null,
                     null, null, false, null,
-                    List.of(), List.of(), pendingInvites
+                    List.of(), List.of(), pendingInvites,
+                    loggedUser.isEmailVerified()
             );
         }
 
@@ -70,7 +71,9 @@ public class DashboardService {
         if (sessionOpt.isEmpty()) {
             return new BusinessDashboardDTO(
                     businessId, businessName, loggedMember.getId(), loggedMember.getRole(),
-                    null, null, false, null, List.of(), teamDtos, List.of()
+                    null, null, false, null,
+                    List.of(), teamDtos, List.of(),
+                    loggedUser.isEmailVerified()
             );
         }
 
@@ -81,7 +84,8 @@ public class DashboardService {
         return new BusinessDashboardDTO(
                 businessId, businessName, loggedMember.getId(), loggedMember.getRole(),
                 session.getId(), session.getTicketCode(), session.getIsActive(),
-                session.getToleranceMinutes(), activeQueueDtos, teamDtos, List.of()
+                session.getToleranceMinutes(), activeQueueDtos, teamDtos, List.of(),
+                loggedUser.isEmailVerified()
         );
     }
 }
