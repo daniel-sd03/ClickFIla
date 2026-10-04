@@ -11,6 +11,7 @@ import sodresoftwares.barbearia.dto.auth.ChangePasswordDTO;
 import sodresoftwares.barbearia.dto.auth.RegisterDTO;
 import sodresoftwares.barbearia.dto.user.UpdateUserDTO;
 import sodresoftwares.barbearia.dto.user.UserResponseDTO;
+import sodresoftwares.barbearia.dto.user.VerifyEmailDTO;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.services.UserService;
 
@@ -42,6 +43,21 @@ public class UserController {
             HttpServletRequest request) {
         userService.registerProfessional(data, request);
         return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<Void> verifyEmail(
+            @AuthenticationPrincipal User loggedUser,
+            @Valid @RequestBody VerifyEmailDTO dto) {
+        userService.verifyEmail(loggedUser.getId(), dto.code());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/resend-otp")
+    public ResponseEntity<Void> resendOtp(
+            @AuthenticationPrincipal User loggedUser) {
+        userService.resendVerificationEmail(loggedUser.getId());
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/me/upgrade-role")

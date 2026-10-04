@@ -1,16 +1,17 @@
 CREATE TABLE users
 (
-    id                 TEXT PRIMARY KEY UNIQUE   NOT NULL,
-    login              TEXT UNIQUE               NOT NULL,
-    password           TEXT                      NOT NULL,
-    name               TEXT                      NOT NULL,
+    id                 TEXT PRIMARY KEY UNIQUE NOT NULL,
+    login              TEXT UNIQUE             NOT NULL,
+    password           TEXT                    NOT NULL,
+    name               TEXT                    NOT NULL,
     phone              TEXT,
-    role               TEXT                      NOT NULL,
+    role               TEXT                    NOT NULL,
     google_id          TEXT UNIQUE,
-    is_active          BOOLEAN                   NOT NULL,
-    tutorial_completed BOOLEAN     DEFAULT FALSE NOT NULL,
+    is_active          BOOLEAN                 NOT NULL,
+    tutorial_completed BOOLEAN                          DEFAULT FALSE NOT NULL,
+    email_verified     BOOLEAN                 NOT NULL DEFAULT FALSE,
     deleted_at         TIMESTAMPTZ,
-    created_at         TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_at         TIMESTAMPTZ                      DEFAULT CURRENT_TIMESTAMP,
     updated_at         TIMESTAMPTZ,
     created_by         VARCHAR(255),
     updated_by         VARCHAR(255)
@@ -202,12 +203,12 @@ CREATE TABLE payments
 
 CREATE TABLE subscription_history
 (
-    id                TEXT PRIMARY KEY UNIQUE NOT NULL,
-    subscription_id   TEXT                    NOT NULL,
-    previous_status   VARCHAR(30),
-    new_status        VARCHAR(30)             NOT NULL,
-    reason            TEXT                    NOT NULL,
-    created_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    id              TEXT PRIMARY KEY UNIQUE NOT NULL,
+    subscription_id TEXT                    NOT NULL,
+    previous_status VARCHAR(30),
+    new_status      VARCHAR(30)             NOT NULL,
+    reason          TEXT                    NOT NULL,
+    created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_history_subscription FOREIGN KEY (subscription_id) REFERENCES subscriptions (id) ON DELETE CASCADE
 );
 

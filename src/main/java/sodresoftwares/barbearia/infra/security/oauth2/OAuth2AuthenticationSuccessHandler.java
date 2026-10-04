@@ -76,6 +76,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             if (userByEmail != null) {
                 finalUser = userByEmail;
                 finalUser.setGoogleId(googleId);
+                finalUser.setEmailVerified(true);
                 userRepository.save(finalUser);
                 log.info("Google account linked successfully");
 
@@ -89,6 +90,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                         .googleId(googleId)
                         .password(UUID.randomUUID().toString())
                         .role(UserRole.USER)
+                        .emailVerified(true)
                         .build();
                 userRepository.save(finalUser);
                 log.info("New user registered via Google OAuth2");

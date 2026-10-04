@@ -73,4 +73,40 @@ class EmailServiceTest {
 
         verify(mailSender).send(any(SimpleMailMessage.class));
     }
+
+    // ==================== SEND VERIFICATION EMAIL TESTS ====================
+
+    @Test
+    @DisplayName("Should build and send verification email successfully")
+    void testSendVerificationEmail_Success() {
+        // Act
+        String verificationCode = "654321";
+        emailService.sendVerificationEmail(TARGET_EMAIL, verificationCode);
+
+        // Assert
+        ArgumentCaptor<SimpleMailMessage> messageCaptor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(messageCaptor.capture());
+
+        SimpleMailMessage capturedMessage = messageCaptor.getValue();
+
+        assertThat(capturedMessage.getFrom()).isEqualTo(SENDER_EMAIL);
+        assertThat(capturedMessage.getTo()).containsExactly(TARGET_EMAIL);
+        assertThat(capturedMessage.getSubject()).isEqualTo("Verificação de Conta - Click Fila");
+        assertThat(capturedMessage.getText()).contains(verificationCode);
+        assertThat(capturedMessage.getText()).contains("Bem-vindo ao Click Fila!");
+    }
+
+    @Test
+    @DisplayName("Should catch exception and not throw it upwards when verification mail sender fails")
+    void testSendVerificationEmail_Failure_ShouldNotThrowException() {
+        // Arrange
+        doThrow(new MailSendException("SMTP Server Down"))
+                .when(mailSender).send(any(SimpleMailMessage.class));
+
+        // Act & Assert
+        assertThatCode(() -> emailService.sendVerificationEmail(TARGET_EMAIL, "654321"))
+                .doesNotThrowAnyException();
+
+        verify(mailSender).send(any(SimpleMailMessage.class));
+    }
 }
