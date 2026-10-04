@@ -24,6 +24,7 @@ import sodresoftwares.barbearia.dto.auth.ChangePasswordDTO;
 import sodresoftwares.barbearia.dto.auth.RegisterDTO;
 import sodresoftwares.barbearia.dto.user.UpdateUserDTO;
 import sodresoftwares.barbearia.dto.user.UserResponseDTO;
+import sodresoftwares.barbearia.dto.user.VerifyEmailDTO;
 import sodresoftwares.barbearia.infra.security.SecurityFilter;
 import sodresoftwares.barbearia.infra.security.SubscriptionCheckInterceptor;
 import sodresoftwares.barbearia.infra.security.WebMvcConfig;
@@ -195,6 +196,50 @@ class UserControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(userService);
+    }
+
+    // ==================== EMAIL VERIFICATION TESTS ====================
+
+    @Test
+    @DisplayName("POST /users/verify-email -> Should return 204 No Content when OTP is valid")
+    void verifyEmail_Success() throws Exception {
+        VerifyEmailDTO dto = new VerifyEmailDTO("123456");
+        doNothing().when(userService).verifyEmail(anyString(), anyString());
+
+        mockMvc.perform(post("/users/verify-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonTester.write(dto).getJson()))
+                .andExpect(status().isNoContent());
+
+        verify(userService).verifyEmail(any(), eq("123456"));
+    }
+
+    @Test
+    @DisplayName("POST /users/verify-email -> Should return 400 Bad Request when OTP is blank")
+    void verifyEmail_ValidationError() throws Exception {
+        VerifyEmailDTO invalidDto = new VerifyEmailDTO("");
+
+        mockMvc.perform(post("/users/verify-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonTester.write(invalidDto).getJson()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userService);
+    }
+
+    // ==================== RESEND VERIFICATION TESTS ====================
+
+    @Test
+    @DisplayName("POST /users/resend-otp -> Should return 204 No Content when resent successfully")
+    void resendOtp_Success() throws Exception {
+        doNothing().when(userService).resendVerificationEmail(anyString());
+
+        mockMvc.perform(post("/users/resend-otp")
+                        .with(user(loggedInUser))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNoContent());
+
+        verify(userService).resendVerificationEmail(any());
     }
 
     // ==================== UPGRADE ROLE TESTS ====================

@@ -40,4 +40,27 @@ public class EmailService {
             log.error("Failed to send password reset email", e);
         }
     }
+
+    @Async
+    public void sendVerificationEmail(String to, String code) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(sender);
+            message.setTo(to);
+            message.setSubject("Verificação de Conta - Click Fila");
+            message.setText("Olá!\n\n" +
+                    "Bem-vindo ao Click Fila! Para liberar a criação de filas e times na sua conta, " +
+                    "use o código de verificação abaixo:\n\n" +
+                    code + "\n\n" +
+                    "Este código é válido por 15 minutos.\n" +
+                    "Equipe Click Fila");
+
+            long startTime = System.currentTimeMillis();
+            mailSender.send(message);
+            log.info("Verification email sent successfully in {} ms", System.currentTimeMillis() - startTime);
+
+        } catch (Exception e) {
+            log.error("Failed to send verification email", e);
+        }
+    }
 }

@@ -11,9 +11,18 @@ import sodresoftwares.barbearia.infra.security.SubscriptionCheckInterceptor;
 public class WebMvcConfig implements WebMvcConfigurer {
 
     private final SubscriptionCheckInterceptor subscriptionCheckInterceptor;
+    private final EmailVerificationInterceptor emailVerificationInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(emailVerificationInterceptor)
+                .addPathPatterns(
+                        "/businesses/**",
+                        "/queue-sessions/**",
+                        "/queue-entries/**",
+                        "/team-members/**"
+                );
+
         registry.addInterceptor(subscriptionCheckInterceptor)
                 .addPathPatterns(
                         "/queue-sessions/**",

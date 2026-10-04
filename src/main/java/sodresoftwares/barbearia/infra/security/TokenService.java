@@ -32,6 +32,7 @@ public class TokenService {
                     .withClaim("user_id", user.getId())
                     .withClaim("role", user.getRole().name())
                     .withClaim("lgpd_version", lgpdVersion)
+                    .withClaim("email_verified", user.isEmailVerified())
                     .withExpiresAt(genExpirationDate())
                     .sign(algorithm);
         } catch (JWTCreationException ex) {

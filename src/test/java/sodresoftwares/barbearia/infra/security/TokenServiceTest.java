@@ -55,6 +55,8 @@ class TokenServiceTest {
     @Test
     @DisplayName("Should validate and decode correct token successfully")
     void shouldValidateCorrectTokenSuccessfully() {
+        testUser.setEmailVerified(true);
+
         String token = tokenService.generateToken(testUser, TEST_LGPD_VERSION);
 
         DecodedJWT decodedJWT = tokenService.validateAndDecodeToken(token);
@@ -64,6 +66,7 @@ class TokenServiceTest {
         assertThat(decodedJWT.getClaim("user_id").asString()).isEqualTo("user-123");
         assertThat(decodedJWT.getClaim("role").asString()).isEqualTo("USER");
         assertThat(decodedJWT.getClaim("lgpd_version").asString()).isEqualTo(TEST_LGPD_VERSION);
+        assertThat(decodedJWT.getClaim("email_verified").asBoolean()).isTrue();
     }
 
     @Test

@@ -15,6 +15,7 @@ import sodresoftwares.barbearia.infra.exception.AppException;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.model.user.UserRole;
 import sodresoftwares.barbearia.repositories.UserRepository;
+import sodresoftwares.barbearia.services.auth.OtpService;
 
 import java.time.Instant;
 
@@ -28,6 +29,8 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final LgpdConsentService lgpdConsentService;
     private final TeamMemberService teamMemberService;
+    private final OtpService otpService;
+    private final EmailService emailService;
 
     @Transactional(readOnly = true)
     public UserResponseDTO getMyProfile(String userId) {
@@ -66,8 +69,12 @@ public class UserService {
 
         User savedUser = userRepository.save(newUser);
         lgpdConsentService.registerConsentForNewUser(savedUser, request);
-        log.info("User registered with role {}", savedUser.getRole());
 
+        if (role == UserRole.PROFESSIONAL) {
+            generateAndSendOtp(savedUser);
+        }
+
+        log.info("User registered with role {}", savedUser.getRole());
         return savedUser;
     }
 
@@ -84,8 +91,13 @@ public class UserService {
         }
 
         user.setRole(UserRole.PROFESSIONAL);
-
         User savedUser = userRepository.save(user);
+
+        if (!savedUser.isEmailVerified()) {
+            generateAndSendOtp(savedUser);
+            log.info("Verification email sent");
+        }
+
         log.info("User {} upgraded to PROFESSIONAL role", loggedUserId);
 
         return UserResponseDTO.fromEntity(savedUser);
@@ -211,6 +223,42 @@ public class UserService {
         return UserResponseDTO.fromEntity(savedUser);
     }
 
+    @Transactional
+    public void verifyEmail(String userId, String otpCode) {
+        boolean isValid = otpService.isValidOtp(userId, otpCode);
+
+        if (!isValid) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_OTP",
+                    "Invalid or expired verification code."
+            );
+        }
+
+        User user = getUserById(userId);
+        user.setEmailVerified(true);
+        userRepository.save(user);
+
+        log.info("User {} successfully verified their email", userId);
+    }
+
+    public void resendVerificationEmail(String userId) {
+        User user = getUserById(userId);
+
+        if (user.isEmailVerified()) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "ALREADY_VERIFIED",
+                    "This email is already verified."
+            );
+        }
+
+        generateAndSendOtp(user);
+
+        log.info("Verification email resent for user {}", userId);
+    }
+
+
     //--------- HELPER METHODS ------
 
     private User getUserById(String userId) {
@@ -220,5 +268,10 @@ public class UserService {
                         "USER_NOT_FOUND",
                         "User not found."
                 ));
+    }
+
+    private void generateAndSendOtp(User user) {
+        String otp = otpService.generateAndSaveOtp(user.getId());
+        emailService.sendVerificationEmail(user.getLogin(), otp);
     }
 }

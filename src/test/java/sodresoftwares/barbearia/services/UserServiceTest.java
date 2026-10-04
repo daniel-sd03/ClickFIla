@@ -18,6 +18,7 @@ import sodresoftwares.barbearia.infra.exception.AppException;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.model.user.UserRole;
 import sodresoftwares.barbearia.repositories.UserRepository;
+import sodresoftwares.barbearia.services.auth.OtpService;
 
 import java.util.Optional;
 
@@ -44,6 +45,12 @@ class UserServiceTest {
 
     @Mock
     private TeamMemberService teamMemberService;
+
+    @Mock
+    private OtpService otpService;
+
+    @Mock
+    private EmailService emailService;
 
     @InjectMocks
     private UserService userService;
@@ -132,6 +139,8 @@ class UserServiceTest {
                         user.getRole().equals(UserRole.USER)
         ));
         verify(lgpdConsentService).registerConsentForNewUser(testUser, request);
+        verify(otpService, never()).generateAndSaveOtp(anyString());
+        verify(emailService, never()).sendVerificationEmail(anyString(), anyString());
     }
 
     @Test
@@ -162,6 +171,7 @@ class UserServiceTest {
         when(userRepository.existsByLogin(testUser.getLogin())).thenReturn(false);
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_PASSWORD);
         when(userRepository.save(any(User.class))).thenReturn(testUser);
+        when(otpService.generateAndSaveOtp(testUser.getId())).thenReturn("123456");
 
         // Act
         userService.registerProfessional(registerDTO, request);
@@ -172,6 +182,8 @@ class UserServiceTest {
                         user.getRole().equals(UserRole.PROFESSIONAL)
         ));
         verify(lgpdConsentService).registerConsentForNewUser(testUser, request);
+        verify(otpService).generateAndSaveOtp(testUser.getId());
+        verify(emailService).sendVerificationEmail(testUser.getLogin(), "123456");
     }
 
     @Test
@@ -192,12 +204,37 @@ class UserServiceTest {
     // ==================== UPGRADE TO PROFESSIONAL TESTS ====================
 
     @Test
-    @DisplayName("Should successfully upgrade a USER to PROFESSIONAL")
-    void upgradeToProfessional_Success() {
+    @DisplayName("Should successfully upgrade a USER to PROFESSIONAL and send OTP if email is not verified")
+    void upgradeToProfessional_Success_NotVerified() {
+        // Arrange
+        User normalUser = User.builder()
+                .id("user-123")
+                .login("user@test.com")
+                .role(UserRole.USER)
+                .emailVerified(false)
+                .build();
+
+        when(userRepository.findById("user-123")).thenReturn(Optional.of(normalUser));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(otpService.generateAndSaveOtp("user-123")).thenReturn("123456");
+
+        // Act
+        UserResponseDTO result = userService.upgradeToProfessional("user-123");
+
+        // Assert
+        assertThat(result.role()).isEqualTo(UserRole.PROFESSIONAL.name());
+        verify(otpService).generateAndSaveOtp("user-123");
+        verify(emailService).sendVerificationEmail("user@test.com", "123456");
+    }
+
+    @Test
+    @DisplayName("Should successfully upgrade to PROFESSIONAL but SKIP OTP if email is already verified")
+    void upgradeToProfessional_Success_AlreadyVerified() {
         // Arrange
         User normalUser = User.builder()
                 .id("user-123")
                 .role(UserRole.USER)
+                .emailVerified(true)
                 .build();
 
         when(userRepository.findById("user-123")).thenReturn(Optional.of(normalUser));
@@ -207,11 +244,9 @@ class UserServiceTest {
         UserResponseDTO result = userService.upgradeToProfessional("user-123");
 
         // Assert
-        assertThat(result).isNotNull();
         assertThat(result.role()).isEqualTo(UserRole.PROFESSIONAL.name());
-        assertThat(normalUser.getRole()).isEqualTo(UserRole.PROFESSIONAL);
-
-        verify(userRepository).save(normalUser);
+        verify(otpService, never()).generateAndSaveOtp(anyString());
+        verify(emailService, never()).sendVerificationEmail(anyString(), anyString());
     }
 
     @Test
@@ -562,5 +597,62 @@ class UserServiceTest {
 
         verify(teamMemberService, never()).deactivateProfessionalLinksForUser(any());
         verify(userRepository, never()).save(any());
+    }
+
+    // ==================== EMAIL VERIFICATION TESTS ====================
+
+    @Test
+    @DisplayName("Should verify email successfully when OTP is valid")
+    void verifyEmail_Success() {
+        when(otpService.isValidOtp(USER_ID, "123456")).thenReturn(true);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(testUser));
+
+        userService.verifyEmail(USER_ID, "123456");
+
+        assertThat(testUser.isEmailVerified()).isTrue();
+        verify(userRepository).save(testUser);
+    }
+
+    @Test
+    @DisplayName("Should throw exception when OTP is invalid or expired")
+    void verifyEmail_InvalidOtp() {
+        when(otpService.isValidOtp(USER_ID, "000000")).thenReturn(false);
+
+        assertThatThrownBy(() -> userService.verifyEmail(USER_ID, "000000"))
+                .isInstanceOf(AppException.class)
+                .hasMessage("Invalid or expired verification code.")
+                .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(userRepository, never()).save(any());
+    }
+
+    // ==================== RESEND VERIFICATION TESTS ====================
+
+    @Test
+    @DisplayName("Should resend verification email successfully")
+    void resendVerificationEmail_Success() {
+        testUser.setEmailVerified(false);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(testUser));
+        when(otpService.generateAndSaveOtp(USER_ID)).thenReturn("654321");
+
+        userService.resendVerificationEmail(USER_ID);
+
+        verify(otpService).generateAndSaveOtp(USER_ID);
+        verify(emailService).sendVerificationEmail(testUser.getLogin(), "654321");
+    }
+
+    @Test
+    @DisplayName("Should throw exception when trying to resend to an already verified user")
+    void resendVerificationEmail_AlreadyVerified() {
+        testUser.setEmailVerified(true);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(testUser));
+
+        assertThatThrownBy(() -> userService.resendVerificationEmail(USER_ID))
+                .isInstanceOf(AppException.class)
+                .hasMessage("This email is already verified.")
+                .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(otpService, never()).generateAndSaveOtp(anyString());
+        verify(emailService, never()).sendVerificationEmail(anyString(), anyString());
     }
 }

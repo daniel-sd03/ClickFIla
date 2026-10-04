@@ -58,6 +58,9 @@ public class User implements UserDetails {
 	@Column(name = "tutorial_completed", nullable = false)
 	private Boolean tutorialCompleted = false;
 
+	@Column(name = "email_verified", nullable = false)
+	private boolean emailVerified = false;
+
 	@Column(name = "deleted_at")
 	private Instant deletedAt;
 
