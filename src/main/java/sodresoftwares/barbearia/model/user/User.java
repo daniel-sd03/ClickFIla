@@ -58,6 +58,7 @@ public class User implements UserDetails {
 	@Column(name = "tutorial_completed", nullable = false)
 	private Boolean tutorialCompleted = false;
 
+	@Builder.Default
 	@Column(name = "email_verified", nullable = false)
 	private boolean emailVerified = false;
 

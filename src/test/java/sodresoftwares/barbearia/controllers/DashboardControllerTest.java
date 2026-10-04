@@ -107,7 +107,8 @@ class DashboardControllerTest {
                 15,
                 List.of(),
                 List.of(),
-                List.of(mockInvite)
+                List.of(mockInvite),
+                true
         );
 
         when(dashboardService.getProfessionalDashboard(any())).thenReturn(mockDashboard);
@@ -120,6 +121,7 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.businessName").value("Barbearia do Zé"))
                 .andExpect(jsonPath("$.loggedMemberRole").value("OWNER"))
                 .andExpect(jsonPath("$.sessionId").value("session-123"))
-                .andExpect(jsonPath("$.pendingInvites[0].id").value("inv-1"));
+                .andExpect(jsonPath("$.pendingInvites[0].id").value("inv-1"))
+                .andExpect(jsonPath("$.emailVerified").value(true));
     }
 }

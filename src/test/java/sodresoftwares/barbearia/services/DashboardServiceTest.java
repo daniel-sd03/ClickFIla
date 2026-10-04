@@ -66,6 +66,7 @@ class DashboardServiceTest {
                 .id(LOGGED_USER_ID)
                 .login("ze@test.com")
                 .name("Zé Barbeiro")
+                .emailVerified(true)
                 .build();
 
         teamMember = TeamMember.builder()
@@ -115,6 +116,7 @@ class DashboardServiceTest {
         assertThat(result.loggedMemberRole()).isNull();
         assertThat(result.pendingInvites()).hasSize(1);
         assertThat(result.pendingInvites().get(0).id()).isEqualTo("inv-1");
+        assertThat(result.emailVerified()).isTrue();
 
         verifyNoInteractions(queueSessionRepository, queueCacheService, queueMapper);
     }
@@ -143,6 +145,7 @@ class DashboardServiceTest {
         // Assert
         assertThat(result.team()).hasSize(2);
         assertThat(result.team().get(1).name()).isEqualTo("Fantasma Silva");
+        assertThat(result.emailVerified()).isTrue();
     }
 
     @Test
@@ -164,6 +167,7 @@ class DashboardServiceTest {
         assertThat(result.sessionId()).isNull();
         assertThat(result.activeQueue()).isEmpty();
         assertThat(result.pendingInvites()).isEmpty();
+        assertThat(result.emailVerified()).isTrue();
 
         verifyNoInteractions(queueCacheService, queueMapper);
     }
@@ -192,6 +196,7 @@ class DashboardServiceTest {
         assertThat(result.businessId()).isEqualTo(BUSINESS_ID);
         assertThat(result.sessionId()).isEqualTo(SESSION_ID);
         assertThat(result.activeQueue()).hasSize(1);
+        assertThat(result.emailVerified()).isTrue();
 
         verify(queueCacheService).getActiveEntriesDTO(SESSION_ID);
     }
