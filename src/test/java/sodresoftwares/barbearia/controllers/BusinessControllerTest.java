@@ -19,6 +19,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import sodresoftwares.barbearia.controllers.business.BusinessController;
 import sodresoftwares.barbearia.dto.business.BusinessResponseDTO;
 import sodresoftwares.barbearia.dto.business.CreateBusinessDTO;
 import sodresoftwares.barbearia.dto.business.UpdateBusinessDTO;
@@ -28,7 +29,7 @@ import sodresoftwares.barbearia.infra.security.SubscriptionCheckInterceptor;
 import sodresoftwares.barbearia.infra.security.WebMvcConfig;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.model.user.UserRole;
-import sodresoftwares.barbearia.services.BusinessService;
+import sodresoftwares.barbearia.services.business.BusinessService;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;

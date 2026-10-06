@@ -7,7 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import sodresoftwares.barbearia.model.Business;
+import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.billing.*;
 import sodresoftwares.barbearia.repositories.billing.PaymentRepository;
 import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;

@@ -20,14 +20,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import sodresoftwares.barbearia.controllers.queue.QueueEntryController;
 import sodresoftwares.barbearia.dto.queue.*;
 import sodresoftwares.barbearia.infra.security.SecurityFilter;
 import sodresoftwares.barbearia.infra.security.SubscriptionCheckInterceptor;
 import sodresoftwares.barbearia.infra.security.WebMvcConfig;
-import sodresoftwares.barbearia.model.QueueEntryStatus;
+import sodresoftwares.barbearia.model.queue.QueueEntryStatus;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.model.user.UserRole;
-import sodresoftwares.barbearia.services.QueueEntryService;
+import sodresoftwares.barbearia.services.queue.QueueEntryService;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

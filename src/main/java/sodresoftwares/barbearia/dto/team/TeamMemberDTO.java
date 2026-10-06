@@ -1,6 +1,6 @@
 package sodresoftwares.barbearia.dto.team;
 
-import sodresoftwares.barbearia.model.TeamRole;
+import sodresoftwares.barbearia.model.team.TeamRole;
 
 public record TeamMemberDTO(
         String id,

@@ -1,6 +1,6 @@
 package sodresoftwares.barbearia.ports;
 
-import sodresoftwares.barbearia.model.Business;
+import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.billing.Plan;
 
 public interface PaymentGatewayPort {

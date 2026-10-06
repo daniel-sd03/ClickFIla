@@ -13,7 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import sodresoftwares.barbearia.dto.billing.SubscriptionResponseDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
-import sodresoftwares.barbearia.model.Business;
+import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.billing.*;
 import sodresoftwares.barbearia.ports.PaymentGatewayPort;
 import sodresoftwares.barbearia.repositories.billing.PaymentRepository;

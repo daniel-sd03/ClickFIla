@@ -3,7 +3,7 @@ package sodresoftwares.barbearia.dto.business;
 import sodresoftwares.barbearia.dto.queue.QueueEntryResponseDTO;
 import sodresoftwares.barbearia.dto.team.TeamInviteResponseDTO;
 import sodresoftwares.barbearia.dto.team.TeamMemberDTO;
-import sodresoftwares.barbearia.model.TeamRole;
+import sodresoftwares.barbearia.model.team.TeamRole;
 
 import java.util.List;
 

@@ -7,7 +7,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-import sodresoftwares.barbearia.model.Business;
+import sodresoftwares.barbearia.model.business.Business;
 
 import java.time.Instant;
 import java.time.LocalDate;

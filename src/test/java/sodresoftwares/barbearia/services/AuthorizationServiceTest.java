@@ -10,7 +10,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import sodresoftwares.barbearia.model.user.User;
-import sodresoftwares.barbearia.repositories.UserRepository;
+import sodresoftwares.barbearia.repositories.user.UserRepository;
+import sodresoftwares.barbearia.services.auth.AuthorizationService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

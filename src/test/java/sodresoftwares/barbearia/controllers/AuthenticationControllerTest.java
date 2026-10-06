@@ -18,14 +18,15 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import sodresoftwares.barbearia.controllers.auth.AuthenticationController;
 import sodresoftwares.barbearia.dto.auth.*;
 import sodresoftwares.barbearia.infra.security.SecurityFilter;
 import sodresoftwares.barbearia.infra.security.SubscriptionCheckInterceptor;
 import sodresoftwares.barbearia.infra.security.WebMvcConfig;
 import sodresoftwares.barbearia.model.user.UserRole;
-import sodresoftwares.barbearia.services.AuthenticationService;
-import sodresoftwares.barbearia.services.PasswordResetService;
-import sodresoftwares.barbearia.services.RefreshTokenService;
+import sodresoftwares.barbearia.services.auth.AuthenticationService;
+import sodresoftwares.barbearia.services.auth.PasswordResetService;
+import sodresoftwares.barbearia.services.auth.RefreshTokenService;
 
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;

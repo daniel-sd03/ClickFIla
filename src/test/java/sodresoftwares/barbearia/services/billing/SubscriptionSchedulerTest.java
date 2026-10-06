@@ -8,7 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
-import sodresoftwares.barbearia.model.Business;
+import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.billing.Payment;
 import sodresoftwares.barbearia.model.billing.PaymentStatus;
 import sodresoftwares.barbearia.model.billing.Subscription;

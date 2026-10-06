@@ -8,9 +8,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import sodresoftwares.barbearia.dto.push.PushSubscriptionDTO;
-import sodresoftwares.barbearia.model.UserPushSubscription;
+import sodresoftwares.barbearia.model.notification.UserPushSubscription;
 import sodresoftwares.barbearia.model.user.User;
-import sodresoftwares.barbearia.repositories.UserPushSubscriptionRepository;
+import sodresoftwares.barbearia.repositories.notification.UserPushSubscriptionRepository;
+import sodresoftwares.barbearia.services.notification.PushSubscriptionService;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;

@@ -6,9 +6,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import sodresoftwares.barbearia.dto.queue.QueueEntryResponseDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
-import sodresoftwares.barbearia.model.QueueEntry;
-import sodresoftwares.barbearia.model.QueueEntryStatus;
-import sodresoftwares.barbearia.model.QueueSession;
+import sodresoftwares.barbearia.model.queue.QueueEntry;
+import sodresoftwares.barbearia.model.queue.QueueEntryStatus;
+import sodresoftwares.barbearia.model.queue.QueueSession;
 import sodresoftwares.barbearia.model.user.User;
 
 import java.time.Instant;

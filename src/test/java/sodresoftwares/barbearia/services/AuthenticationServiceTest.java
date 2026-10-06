@@ -15,11 +15,14 @@ import sodresoftwares.barbearia.dto.auth.AuthenticationDTO;
 import sodresoftwares.barbearia.dto.auth.TokenResponseDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
 import sodresoftwares.barbearia.infra.security.TokenService;
-import sodresoftwares.barbearia.model.LgpdConsent;
-import sodresoftwares.barbearia.model.RefreshToken;
+import sodresoftwares.barbearia.model.auth.LgpdConsent;
+import sodresoftwares.barbearia.model.auth.RefreshToken;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.model.user.UserRole;
-import sodresoftwares.barbearia.repositories.LgpdConsentRepository;
+import sodresoftwares.barbearia.repositories.auth.LgpdConsentRepository;
+import sodresoftwares.barbearia.services.auth.AuthenticationService;
+import sodresoftwares.barbearia.services.auth.RefreshTokenService;
+import sodresoftwares.barbearia.services.user.UserService;
 
 import java.util.Optional;
 

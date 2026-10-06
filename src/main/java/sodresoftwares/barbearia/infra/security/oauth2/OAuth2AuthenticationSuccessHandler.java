@@ -12,13 +12,13 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 import sodresoftwares.barbearia.infra.security.TokenService;
-import sodresoftwares.barbearia.model.RefreshToken;
+import sodresoftwares.barbearia.model.auth.RefreshToken;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.model.user.UserRole;
-import sodresoftwares.barbearia.model.LgpdConsent;
-import sodresoftwares.barbearia.repositories.LgpdConsentRepository;
-import sodresoftwares.barbearia.repositories.UserRepository;
-import sodresoftwares.barbearia.services.RefreshTokenService;
+import sodresoftwares.barbearia.model.auth.LgpdConsent;
+import sodresoftwares.barbearia.repositories.auth.LgpdConsentRepository;
+import sodresoftwares.barbearia.repositories.user.UserRepository;
+import sodresoftwares.barbearia.services.auth.RefreshTokenService;
 
 import java.io.IOException;
 import java.util.UUID;

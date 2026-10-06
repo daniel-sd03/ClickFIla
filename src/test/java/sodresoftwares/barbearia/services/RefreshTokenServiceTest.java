@@ -11,9 +11,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 import sodresoftwares.barbearia.dto.auth.TokenRefreshResponseDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
 import sodresoftwares.barbearia.infra.security.TokenService;
-import sodresoftwares.barbearia.model.RefreshToken;
+import sodresoftwares.barbearia.model.auth.RefreshToken;
 import sodresoftwares.barbearia.model.user.User;
-import sodresoftwares.barbearia.repositories.RefreshTokenRepository;
+import sodresoftwares.barbearia.repositories.auth.RefreshTokenRepository;
+import sodresoftwares.barbearia.services.auth.RefreshTokenService;
 
 import java.time.Instant;
 import java.util.Optional;

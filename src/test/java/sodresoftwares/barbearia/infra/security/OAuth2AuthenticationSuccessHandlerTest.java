@@ -15,13 +15,13 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.test.util.ReflectionTestUtils;
 import sodresoftwares.barbearia.infra.security.oauth2.OAuth2AuthenticationSuccessHandler;
-import sodresoftwares.barbearia.model.LgpdConsent;
-import sodresoftwares.barbearia.model.RefreshToken;
+import sodresoftwares.barbearia.model.auth.LgpdConsent;
+import sodresoftwares.barbearia.model.auth.RefreshToken;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.model.user.UserRole;
-import sodresoftwares.barbearia.repositories.LgpdConsentRepository;
-import sodresoftwares.barbearia.repositories.UserRepository;
-import sodresoftwares.barbearia.services.RefreshTokenService;
+import sodresoftwares.barbearia.repositories.auth.LgpdConsentRepository;
+import sodresoftwares.barbearia.repositories.user.UserRepository;
+import sodresoftwares.barbearia.services.auth.RefreshTokenService;
 
 import java.util.List;
 import java.util.Optional;

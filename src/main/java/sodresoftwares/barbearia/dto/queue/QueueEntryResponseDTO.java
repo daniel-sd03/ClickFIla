@@ -1,6 +1,6 @@
 package sodresoftwares.barbearia.dto.queue;
 
-import sodresoftwares.barbearia.model.QueueEntryStatus;
+import sodresoftwares.barbearia.model.queue.QueueEntryStatus;
 
 import java.time.Instant;
 

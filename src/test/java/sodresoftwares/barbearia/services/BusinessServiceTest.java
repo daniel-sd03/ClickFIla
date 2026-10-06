@@ -12,14 +12,19 @@ import sodresoftwares.barbearia.dto.business.BusinessResponseDTO;
 import sodresoftwares.barbearia.dto.business.CreateBusinessDTO;
 import sodresoftwares.barbearia.dto.business.UpdateBusinessDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
-import sodresoftwares.barbearia.model.Business;
-import sodresoftwares.barbearia.model.TeamMember;
-import sodresoftwares.barbearia.model.TeamRole;
+import sodresoftwares.barbearia.model.business.Business;
+import sodresoftwares.barbearia.model.team.TeamMember;
+import sodresoftwares.barbearia.model.team.TeamRole;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.model.user.UserRole;
-import sodresoftwares.barbearia.repositories.*;
 import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;
+import sodresoftwares.barbearia.repositories.business.BusinessRepository;
+import sodresoftwares.barbearia.repositories.queue.QueueEntryRepository;
+import sodresoftwares.barbearia.repositories.queue.QueueSessionRepository;
+import sodresoftwares.barbearia.repositories.team.TeamMemberRepository;
+import sodresoftwares.barbearia.repositories.user.UserRepository;
 import sodresoftwares.barbearia.services.billing.SubscriptionService;
+import sodresoftwares.barbearia.services.business.BusinessService;
 
 import java.util.Optional;
 

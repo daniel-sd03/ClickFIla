@@ -13,10 +13,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import sodresoftwares.barbearia.dto.auth.ResetPasswordDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
-import sodresoftwares.barbearia.model.PasswordResetToken;
+import sodresoftwares.barbearia.model.auth.PasswordResetToken;
 import sodresoftwares.barbearia.model.user.User;
-import sodresoftwares.barbearia.repositories.PasswordResetTokenRepository;
-import sodresoftwares.barbearia.repositories.UserRepository;
+import sodresoftwares.barbearia.repositories.auth.PasswordResetTokenRepository;
+import sodresoftwares.barbearia.repositories.user.UserRepository;
+import sodresoftwares.barbearia.services.auth.PasswordResetService;
+import sodresoftwares.barbearia.services.notification.EmailService;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

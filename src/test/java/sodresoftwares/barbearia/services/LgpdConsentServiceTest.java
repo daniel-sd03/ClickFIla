@@ -12,11 +12,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import sodresoftwares.barbearia.dto.auth.TokenResponseDTO;
 import sodresoftwares.barbearia.infra.security.TokenService;
-import sodresoftwares.barbearia.model.LgpdConsent;
-import sodresoftwares.barbearia.model.RefreshToken;
+import sodresoftwares.barbearia.model.auth.LgpdConsent;
+import sodresoftwares.barbearia.model.auth.RefreshToken;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.model.user.UserRole;
-import sodresoftwares.barbearia.repositories.LgpdConsentRepository;
+import sodresoftwares.barbearia.repositories.auth.LgpdConsentRepository;
+import sodresoftwares.barbearia.services.auth.LgpdConsentService;
+import sodresoftwares.barbearia.services.auth.RefreshTokenService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;

@@ -10,18 +10,25 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import sodresoftwares.barbearia.dto.business.BusinessDashboardDTO;
 import sodresoftwares.barbearia.dto.queue.QueueEntryResponseDTO;
 import sodresoftwares.barbearia.mappers.QueueMapper;
-import sodresoftwares.barbearia.model.*;
+import sodresoftwares.barbearia.model.business.Business;
+import sodresoftwares.barbearia.model.queue.QueueEntryStatus;
+import sodresoftwares.barbearia.model.queue.QueueSession;
+import sodresoftwares.barbearia.model.team.InviteStatus;
+import sodresoftwares.barbearia.model.team.TeamInvite;
+import sodresoftwares.barbearia.model.team.TeamMember;
+import sodresoftwares.barbearia.model.team.TeamRole;
 import sodresoftwares.barbearia.model.user.User;
-import sodresoftwares.barbearia.repositories.QueueSessionRepository;
-import sodresoftwares.barbearia.repositories.TeamInviteRepository;
-import sodresoftwares.barbearia.repositories.TeamMemberRepository;
+import sodresoftwares.barbearia.repositories.queue.QueueSessionRepository;
+import sodresoftwares.barbearia.repositories.team.TeamInviteRepository;
+import sodresoftwares.barbearia.repositories.team.TeamMemberRepository;
+import sodresoftwares.barbearia.services.business.DashboardService;
+import sodresoftwares.barbearia.services.queue.QueueCacheService;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)

@@ -17,8 +17,12 @@ import sodresoftwares.barbearia.dto.user.UserResponseDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.model.user.UserRole;
-import sodresoftwares.barbearia.repositories.UserRepository;
+import sodresoftwares.barbearia.repositories.user.UserRepository;
+import sodresoftwares.barbearia.services.auth.LgpdConsentService;
 import sodresoftwares.barbearia.services.auth.OtpService;
+import sodresoftwares.barbearia.services.notification.EmailService;
+import sodresoftwares.barbearia.services.team.TeamMemberService;
+import sodresoftwares.barbearia.services.user.UserService;
 
 import java.util.Optional;
 

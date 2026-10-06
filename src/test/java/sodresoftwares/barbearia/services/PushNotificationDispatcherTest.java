@@ -7,8 +7,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import sodresoftwares.barbearia.model.UserPushSubscription;
-import sodresoftwares.barbearia.repositories.UserPushSubscriptionRepository;
+import sodresoftwares.barbearia.model.notification.UserPushSubscription;
+import sodresoftwares.barbearia.repositories.notification.UserPushSubscriptionRepository;
+import sodresoftwares.barbearia.services.notification.PushNotificationDispatcher;
+import sodresoftwares.barbearia.services.notification.WebPushService;
 
 import java.util.List;
 

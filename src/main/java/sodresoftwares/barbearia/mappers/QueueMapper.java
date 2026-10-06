@@ -4,8 +4,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import sodresoftwares.barbearia.dto.queue.QueueEntryResponseDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
-import sodresoftwares.barbearia.model.QueueEntry;
-import sodresoftwares.barbearia.model.QueueEntryStatus;
+import sodresoftwares.barbearia.model.queue.QueueEntry;
+import sodresoftwares.barbearia.model.queue.QueueEntryStatus;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

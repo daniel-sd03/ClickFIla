@@ -13,7 +13,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import sodresoftwares.barbearia.infra.exception.AppException;
-import sodresoftwares.barbearia.model.Business;
+import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.billing.BillingCycle;
 import sodresoftwares.barbearia.model.billing.Plan;
 import sodresoftwares.barbearia.model.user.User;

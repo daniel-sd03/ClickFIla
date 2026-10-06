@@ -19,15 +19,16 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import sodresoftwares.barbearia.controllers.team.TeamInviteController;
 import sodresoftwares.barbearia.dto.team.CreateTeamInviteDTO;
 import sodresoftwares.barbearia.dto.team.TeamInviteResponseDTO;
 import sodresoftwares.barbearia.infra.security.SecurityFilter;
 import sodresoftwares.barbearia.infra.security.SubscriptionCheckInterceptor;
 import sodresoftwares.barbearia.infra.security.WebMvcConfig;
-import sodresoftwares.barbearia.model.TeamRole;
+import sodresoftwares.barbearia.model.team.TeamRole;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.model.user.UserRole;
-import sodresoftwares.barbearia.services.TeamInviteService;
+import sodresoftwares.barbearia.services.team.TeamInviteService;
 
 import java.time.Instant;
 import java.util.List;

@@ -11,11 +11,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import sodresoftwares.barbearia.dto.team.QuickCreateMemberDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
-import sodresoftwares.barbearia.model.Business;
-import sodresoftwares.barbearia.model.TeamMember;
-import sodresoftwares.barbearia.model.TeamRole;
-import sodresoftwares.barbearia.repositories.QueueEntryRepository;
-import sodresoftwares.barbearia.repositories.TeamMemberRepository;
+import sodresoftwares.barbearia.model.business.Business;
+import sodresoftwares.barbearia.model.team.TeamMember;
+import sodresoftwares.barbearia.model.team.TeamRole;
+import sodresoftwares.barbearia.repositories.queue.QueueEntryRepository;
+import sodresoftwares.barbearia.repositories.team.TeamMemberRepository;
+import sodresoftwares.barbearia.services.business.BusinessService;
+import sodresoftwares.barbearia.services.team.TeamMemberService;
 
 import java.util.Optional;
 

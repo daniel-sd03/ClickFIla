@@ -1,6 +1,5 @@
 package sodresoftwares.barbearia.controllers;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,12 +17,13 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import sodresoftwares.barbearia.controllers.notification.PushNotificationController;
 import sodresoftwares.barbearia.dto.push.PushSubscriptionDTO;
 import sodresoftwares.barbearia.infra.exception.GlobalExceptionHandler;
 import sodresoftwares.barbearia.infra.security.SecurityFilter;
 import sodresoftwares.barbearia.infra.security.SubscriptionCheckInterceptor;
 import sodresoftwares.barbearia.infra.security.WebMvcConfig;
-import sodresoftwares.barbearia.services.PushSubscriptionService;
+import sodresoftwares.barbearia.services.notification.PushSubscriptionService;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
