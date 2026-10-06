@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import sodresoftwares.barbearia.dto.push.PushSubscriptionDTO;
+import sodresoftwares.barbearia.dto.notification.PushSubscriptionDTO;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.services.notification.PushSubscriptionService;
 

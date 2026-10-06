@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import sodresoftwares.barbearia.dto.push.PushSubscriptionDTO;
+import sodresoftwares.barbearia.dto.notification.PushSubscriptionDTO;
 import sodresoftwares.barbearia.model.notification.UserPushSubscription;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.repositories.notification.UserPushSubscriptionRepository;
