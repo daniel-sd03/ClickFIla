@@ -19,5 +19,6 @@ public record BusinessDashboardDTO(
         List<QueueEntryResponseDTO> activeQueue,
         List<TeamMemberDTO> team,
         List<TeamInviteResponseDTO> pendingInvites,
-        boolean emailVerified
+        boolean emailVerified,
+        Boolean businessIsActive
 ) {}

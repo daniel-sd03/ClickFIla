@@ -69,41 +69,19 @@ public class BusinessService {
                         "BUSINESS_ALREADY_EXISTS",
                         "This user already owns an active registered business."
                 );
+            } else {
+                throw new AppException(
+                        HttpStatus.CONFLICT,
+                        "BUSINESS_INACTIVE",
+                        "This user already owns an inactive business. Please reactivate it instead of creating a new one."
+                );
             }
-
-            existingBusiness.setName(data.name().trim());
-            existingBusiness.setIsActive(true);
-            businessRepository.save(existingBusiness);
-
-            TeamMember ownerMember = teamMemberRepository
-                    .findByBusinessIdAndUserId(existingBusiness.getId(), userId)
-                    .map(existingMember -> {
-                        existingMember.setName(user.getName());
-                        existingMember.setRole(TeamRole.OWNER);
-                        existingMember.setIsActive(true);
-                        return existingMember;
-                    })
-                    .orElseGet(() -> TeamMember.builder()
-                            .business(existingBusiness)
-                            .name(user.getName())
-                            .user(user)
-                            .role(TeamRole.OWNER)
-                            .isActive(true)
-                            .build());
-
-            teamMemberRepository.save(ownerMember);
-
-            if (!subscriptionRepository.existsByBusinessId(existingBusiness.getId())) {
-                subscriptionService.createTrialSubscription(existingBusiness);
-            }
-
-            log.info("Existing business reactivated successfully for user {}", userId);
-            return;
         }
 
         Business newBusiness = Business.builder()
                 .user(user)
                 .name(data.name().trim())
+                .cpfCnpj(data.cpfCnpj() != null ? data.cpfCnpj().trim() : null)
                 .isActive(true)
                 .build();
 
@@ -166,5 +144,42 @@ public class BusinessService {
 
         teamMemberRepository.deactivateAllByBusinessId(business.getId());
         log.info("Business {} and all its active team members were deactivated.", business.getId());
+    }
+
+    @Transactional
+    public void reactivateBusiness(String userId) {
+        Business business = businessRepository.findByUserId(userId)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.NOT_FOUND,
+                        "BUSINESS_NOT_FOUND",
+                        "No business found for this user."
+                ));
+
+        if (business.getIsActive()) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "BUSINESS_ALREADY_ACTIVE",
+                    "This business is already active."
+            );
+        }
+
+        business.setIsActive(true);
+        businessRepository.save(business);
+
+        TeamMember ownerMember = teamMemberRepository.findByBusinessIdAndUserId(business.getId(), userId)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "OWNER_NOT_FOUND",
+                        "Owner member of the business not found."
+                ));
+
+        ownerMember.setIsActive(true);
+        teamMemberRepository.save(ownerMember);
+
+        if (!subscriptionRepository.existsByBusinessId(business.getId())) {
+            subscriptionService.createTrialSubscription(business);
+        }
+
+        log.info("Business {} reactivated successfully by user {}", business.getName(), userId);
     }
 }

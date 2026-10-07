@@ -83,7 +83,10 @@ class BusinessServiceTest {
                 .isActive(true)
                 .build();
 
-        createBusinessDTO = new CreateBusinessDTO("Barbearia do Zé");
+        createBusinessDTO = new CreateBusinessDTO(
+                "Barbearia do Zé",
+                "12345678909"
+        );
     }
 
     // ==================== GET MY BUSINESS PROFILE TESTS ====================
@@ -154,32 +157,18 @@ class BusinessServiceTest {
     }
 
     @Test
-    @DisplayName("Should reactivate existing inactive business and owner member instead of creating a new one")
-    void testCreateBusiness_ReactivateInactiveBusiness() {
+    @DisplayName("Should throw exception when trying to create but user already has an inactive business")
+    void testCreateBusiness_UserHasInactiveBusiness_ThrowsException() {
         testBusiness.setIsActive(false);
-
-        TeamMember inactiveOwner = TeamMember.builder()
-                .id("member-123")
-                .business(testBusiness)
-                .user(testUser)
-                .role(TeamRole.OWNER)
-                .isActive(false)
-                .build();
-
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(testUser));
         when(businessRepository.findByUserId(USER_ID)).thenReturn(Optional.of(testBusiness));
-        when(teamMemberRepository.findByBusinessIdAndUserId(BUSINESS_ID, USER_ID)).thenReturn(Optional.of(inactiveOwner));
-        when(subscriptionRepository.existsByBusinessId(BUSINESS_ID)).thenReturn(false);
 
-        businessService.createBusiness(USER_ID, createBusinessDTO);
+        assertThatThrownBy(() -> businessService.createBusiness(USER_ID, createBusinessDTO))
+                .isInstanceOf(AppException.class)
+                .hasMessage("This user already owns an inactive business. Please reactivate it instead of creating a new one.")
+                .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
 
-        assertThat(testBusiness.getIsActive()).isTrue();
-        assertThat(testBusiness.getName()).isEqualTo("Barbearia do Zé");
-        assertThat(inactiveOwner.getIsActive()).isTrue();
-
-        verify(businessRepository).save(testBusiness);
-        verify(teamMemberRepository).save(inactiveOwner);
-        verify(subscriptionService).createTrialSubscription(testBusiness);
+        verify(businessRepository, never()).save(any(Business.class));
     }
 
     @Test
@@ -311,5 +300,37 @@ class BusinessServiceTest {
 
         verify(businessRepository, never()).save(any());
         verify(teamMemberRepository, never()).deactivateAllByBusinessId(any());
+    }
+
+    // ==================== REACTIVATE BUSINESS TESTS ====================
+
+    @Test
+    @DisplayName("Should reactivate inactive business and its owner")
+    void testReactivateBusiness_Success() {
+        testBusiness.setIsActive(false);
+        TeamMember inactiveOwner = TeamMember.builder().business(testBusiness).user(testUser).isActive(false).build();
+
+        when(businessRepository.findByUserId(USER_ID)).thenReturn(Optional.of(testBusiness));
+        when(teamMemberRepository.findByBusinessIdAndUserId(BUSINESS_ID, USER_ID)).thenReturn(Optional.of(inactiveOwner));
+        when(subscriptionRepository.existsByBusinessId(BUSINESS_ID)).thenReturn(true);
+
+        businessService.reactivateBusiness(USER_ID);
+
+        assertThat(testBusiness.getIsActive()).isTrue();
+        assertThat(inactiveOwner.getIsActive()).isTrue();
+        verify(businessRepository).save(testBusiness);
+        verify(teamMemberRepository).save(inactiveOwner);
+    }
+
+    @Test
+    @DisplayName("Should throw CONFLICT if business is already active during reactivation")
+    void testReactivateBusiness_AlreadyActive() {
+        testBusiness.setIsActive(true);
+        when(businessRepository.findByUserId(USER_ID)).thenReturn(Optional.of(testBusiness));
+
+        assertThatThrownBy(() -> businessService.reactivateBusiness(USER_ID))
+                .isInstanceOf(AppException.class)
+                .hasMessage("This business is already active.")
+                .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
     }
 }

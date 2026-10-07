@@ -108,6 +108,7 @@ class DashboardControllerTest {
                 List.of(),
                 List.of(),
                 List.of(mockInvite),
+                true,
                 true
         );
 
