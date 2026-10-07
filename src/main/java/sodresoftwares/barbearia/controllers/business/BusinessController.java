@@ -42,4 +42,10 @@ public class BusinessController {
         BusinessResponseDTO updatedProfile = businessService.updateBusinessProfile(loggedInUser.getId(), dto);
         return ResponseEntity.ok(updatedProfile);
     }
+
+    @PutMapping("/reactivate")
+    public ResponseEntity<Void> reactivateBusiness(@AuthenticationPrincipal User loggedUser) {
+        businessService.reactivateBusiness(loggedUser.getId());
+        return ResponseEntity.ok().build();
+    }
 }

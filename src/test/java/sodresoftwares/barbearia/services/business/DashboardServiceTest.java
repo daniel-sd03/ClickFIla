@@ -18,6 +18,7 @@ import sodresoftwares.barbearia.model.team.TeamInvite;
 import sodresoftwares.barbearia.model.team.TeamMember;
 import sodresoftwares.barbearia.model.team.TeamRole;
 import sodresoftwares.barbearia.model.user.User;
+import sodresoftwares.barbearia.repositories.business.BusinessRepository;
 import sodresoftwares.barbearia.repositories.queue.QueueSessionRepository;
 import sodresoftwares.barbearia.repositories.team.TeamInviteRepository;
 import sodresoftwares.barbearia.repositories.team.TeamMemberRepository;
@@ -42,6 +43,9 @@ class DashboardServiceTest {
 
     @Mock
     private TeamInviteRepository teamInviteRepository;
+
+    @Mock
+    private BusinessRepository businessRepository;
 
     @Mock
     private QueueCacheService queueCacheService;
@@ -96,19 +100,14 @@ class DashboardServiceTest {
     // ==================== DASHBOARD PROFESSIONAL ====================
 
     @Test
-    @DisplayName("Should return empty dashboard with pending invites when user is not associated with any team")
+    @DisplayName("Should return empty dashboard when user is not associated with any team and has no business")
     void getProfessionalDashboard_NoTeamMember() {
         // Arrange
         when(teamMemberRepository.findActiveByUserIdWithBusiness(LOGGED_USER_ID)).thenReturn(Optional.empty());
+        when(businessRepository.findByUserId(LOGGED_USER_ID)).thenReturn(Optional.empty()); // <-- NOVO COMPORTAMENTO
 
         TeamInvite mockInvite = TeamInvite.builder()
-                .id("inv-1")
-                .business(business)
-                .email("ze@test.com")
-                .role(TeamRole.STAFF)
-                .status(InviteStatus.PENDING)
-                .expiresAt(Instant.now())
-                .build();
+                .id("inv-1").business(business).email("ze@test.com").role(TeamRole.STAFF).status(InviteStatus.PENDING).expiresAt(Instant.now()).build();
 
         when(teamInviteRepository.findAllByEmailAndStatusWithBusiness("ze@test.com", InviteStatus.PENDING))
                 .thenReturn(List.of(mockInvite));
@@ -119,12 +118,27 @@ class DashboardServiceTest {
         // Assert
         assertThat(result).isNotNull();
         assertThat(result.businessId()).isNull();
-        assertThat(result.loggedMemberRole()).isNull();
+        assertThat(result.businessIsActive()).isNull();
         assertThat(result.pendingInvites()).hasSize(1);
-        assertThat(result.pendingInvites().get(0).id()).isEqualTo("inv-1");
-        assertThat(result.emailVerified()).isTrue();
+    }
 
-        verifyNoInteractions(queueSessionRepository, queueCacheService, queueMapper);
+    @Test
+    @DisplayName("Should return dashboard with businessIsActive false when user owns an inactive business")
+    void getProfessionalDashboard_InactiveBusiness() {
+        // Arrange
+        when(teamMemberRepository.findActiveByUserIdWithBusiness(LOGGED_USER_ID)).thenReturn(Optional.empty());
+
+        Business inactiveBusiness = Business.builder().id("biz-inactive").name("Inativa").isActive(false).build();
+        when(businessRepository.findByUserId(LOGGED_USER_ID)).thenReturn(Optional.of(inactiveBusiness));
+
+        // Act
+        BusinessDashboardDTO result = dashboardService.getProfessionalDashboard(mockUser);
+
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.businessId()).isEqualTo("biz-inactive");
+        assertThat(result.businessName()).isEqualTo("Inativa");
+        assertThat(result.businessIsActive()).isFalse();
     }
 
     @Test

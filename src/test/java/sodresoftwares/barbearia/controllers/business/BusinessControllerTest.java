@@ -84,8 +84,6 @@ class BusinessControllerTest {
                 .role(UserRole.PROFESSIONAL)
                 .build();
 
-        createBusinessDTO = new CreateBusinessDTO("Barbearia do Zé");
-
         updateDTO = new UpdateBusinessDTO("New Business Name");
 
         UserResponseDTO userDTO = UserResponseDTO.fromEntity(loggedInUser);
@@ -95,6 +93,11 @@ class BusinessControllerTest {
                 "New Business Name",
                 true,
                 userDTO
+        );
+
+        createBusinessDTO = new CreateBusinessDTO(
+                "Barbearia do Zé",
+                "12345678909"
         );
     }
 
@@ -146,7 +149,7 @@ class BusinessControllerTest {
     @DisplayName("POST /businesses -> Should return 400 when business register fields are blank")
     void testCreateBusiness_ValidationErrors() throws Exception {
         // Arrange
-        CreateBusinessDTO invalidDTO = new CreateBusinessDTO("");
+        CreateBusinessDTO invalidDTO = new CreateBusinessDTO("", "12345678909");
 
         // Act & Assert
         mockMvc.perform(post("/businesses")
@@ -183,5 +186,19 @@ class BusinessControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonTester.write(invalidDTO).getJson()))
                 .andExpect(status().isBadRequest());
+    }
+
+    // ==================== PUT REACTIVATE BUSINESS TESTS ====================
+
+    @Test
+    @DisplayName("PUT /businesses/reactivate -> Should reactivate business and return 200 OK")
+    void testReactivateBusiness_Success() throws Exception {
+        doNothing().when(businessService).reactivateBusiness(any());
+
+        mockMvc.perform(put("/businesses/reactivate")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        verify(businessService).reactivateBusiness(any());
     }
 }
