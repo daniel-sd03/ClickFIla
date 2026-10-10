@@ -91,6 +91,7 @@ jobs:
             VAPID_SUBJECT=${{ secrets.VAPID_SUBJECT }}
             ASAAS_API_URL=${{ secrets.ASAAS_API_URL }}
             ASAAS_API_KEY=${{ secrets.ASAAS_API_KEY }}
+            ASAAS_WEBHOOK_TOKEN=${{ secrets.ASAAS_WEBHOOK_TOKEN }}
 
       - name: Fill Cloudflare token
         id: task-def-cf
