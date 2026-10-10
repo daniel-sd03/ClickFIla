@@ -51,6 +51,7 @@ services:
       # ---  ASAAS API ---
       - ASAAS_API_URL=https://sandbox.asaas.com/api/v3
       - ASAAS_API_KEY=sua_chave_do_asaas_aqui
+      - ASAAS_WEBHOOK_TOKEN=seu_token_de_webhook_aqui
 
       - DOCKER_COMPOSE_ENABLED=true
       - SWAGGER_ENABLED=true

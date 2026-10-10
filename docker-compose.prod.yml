@@ -55,6 +55,7 @@ services:
       # Payment Gateway (Asaas)
       - ASAAS_API_URL=${ASAAS_API_URL}
       - ASAAS_API_KEY=${ASAAS_API_KEY}
+      - ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
 
   redis:
     image: redis:7
