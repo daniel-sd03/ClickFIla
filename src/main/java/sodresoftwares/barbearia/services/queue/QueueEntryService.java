@@ -203,7 +203,7 @@ public class QueueEntryService {
                         "ENTRY_NOT_FOUND",
                         "Entry not found in the active queue."));
 
-        validatePermissionToManageEntry(entry, loggedUserId);
+        validatePermissionToStartService(entry, loggedUserId);
         validateStatusForStart(entry);
 
         entry.setStatus(QueueEntryStatus.IN_SERVICE);
@@ -239,7 +239,12 @@ public class QueueEntryService {
     public void cancelEntry(String entryId, String loggedUserId) {
         QueueEntry entry = getEntryById(entryId);
 
-        validateCancelPermission(entry, loggedUserId);
+        boolean isTheClient = entry.getUser() != null && entry.getUser().getId().equals(loggedUserId);
+
+        if (!isTheClient) {
+            validatePermissionToManageEntry(entry, loggedUserId);
+        }
+
         validateStatusForCancellation(entry, loggedUserId);
 
         entry.setStatus(QueueEntryStatus.CANCELLED);
@@ -248,8 +253,6 @@ public class QueueEntryService {
 
         queueCacheService.evictSessionList(entry.getQueueSession().getId());
         queueNotificationService.notifyQueueUpdate(entry.getQueueSession().getId());
-
-        boolean isTheClient = entry.getUser() != null && entry.getUser().getId().equals(loggedUserId);
 
         if (!isTheClient && entry.getUser() != null) {
             pushDispatcher.notifyCancellation(entry.getUser().getId());
@@ -345,6 +348,14 @@ public class QueueEntryService {
     }
 
     private void validatePermissionToManageEntry(QueueEntry entry, String loggedUserId) {
+        validateEntryOwnership(entry, loggedUserId, true);
+    }
+
+    private void validatePermissionToStartService(QueueEntry entry, String loggedUserId) {
+        validateEntryOwnership(entry, loggedUserId, false);
+    }
+
+    private void validateEntryOwnership(QueueEntry entry, String loggedUserId, boolean allowOwnerOverride) {
         String businessId = entry.getQueueSession().getBusiness().getId();
 
         TeamMember loggedMember = teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue(loggedUserId, businessId)
@@ -353,13 +364,14 @@ public class QueueEntryService {
                         "FORBIDDEN",
                         "You do not belong to the team of this business."));
 
-        if (loggedMember.getRole() == TeamRole.OWNER) {
+        if (allowOwnerOverride && loggedMember.getRole() == TeamRole.OWNER) {
             return;
         }
 
         TeamMember servedBy = entry.getServedByMember();
-        if (servedBy != null && !servedBy.getId().equals(loggedMember.getId())) {
-            log.warn("Security alert: User {} attempted to modify an entry served by member {}", loggedUserId, servedBy.getId());
+        if (servedBy == null || !servedBy.getId().equals(loggedMember.getId())) {
+            log.warn("Security alert: User {} attempted to modify an entry served by member {}",
+                    loggedUserId, servedBy != null ? servedBy.getId() : "NONE");
             throw new AppException(
                     HttpStatus.FORBIDDEN,
                     "FORBIDDEN",
@@ -367,6 +379,7 @@ public class QueueEntryService {
             );
         }
     }
+
     private void validateMemberNotAlreadyAttending(TeamMember member) {
         boolean isBusy = queueEntryRepository.existsByServedByMemberIdAndStatusIn(
                 member.getId(),
@@ -379,22 +392,6 @@ public class QueueEntryService {
                     "MEMBER_BUSY",
                     "You are already attending a client. Finish the current service or cancel before calling the next one."
             );
-        }
-    }
-
-    private void validateCancelPermission(QueueEntry entry, String loggedUserId) {
-        boolean isTeamMember = teamMemberRepository.existsByUserIdAndBusinessIdAndIsActiveTrue(
-                loggedUserId,
-                entry.getQueueSession().getBusiness().getId()
-        );
-        boolean isTheClient = entry.getUser().getId().equals(loggedUserId);
-
-        if (!isTeamMember && !isTheClient) {
-            log.warn("Security alert: User {} attempted to cancel entry {} without permission", loggedUserId, entry.getId());
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "FORBIDDEN",
-                    "You do not have permission to cancel this entry.");
         }
     }
 

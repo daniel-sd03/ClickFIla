@@ -514,6 +514,7 @@ class QueueEntryServiceTest {
     @DisplayName("Should throw bad request exception when trying to requeue an entry that is not CALLED")
     void testRequeueEntry_InvalidStatus() {
         // Arrange
+        waitingEntry.setServedByMember(teamMember); // Necessário para passar pela validação de posse do STAFF
         when(queueEntryRepository.findActiveEntriesBySessionId(SESSION_ID)).thenReturn(List.of(waitingEntry));
         when(teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue(BARBER_USER_ID, business.getId())).thenReturn(Optional.of(teamMember));
 
@@ -530,6 +531,7 @@ class QueueEntryServiceTest {
     void testStartService_Success() {
         // Arrange
         waitingEntry.setStatus(QueueEntryStatus.CALLED);
+        waitingEntry.setServedByMember(teamMember); // Vincula ao profissional que está iniciando
 
         when(queueEntryRepository.findActiveEntriesBySessionId(SESSION_ID)).thenReturn(List.of(waitingEntry));
         when(teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue(BARBER_USER_ID, business.getId())).thenReturn(Optional.of(teamMember));
@@ -544,10 +546,38 @@ class QueueEntryServiceTest {
     }
 
     @Test
+    @DisplayName("Should block even the OWNER from starting a service called by another member")
+    void testStartService_OwnerCannotStartOtherMemberService() {
+        // Arrange
+        waitingEntry.setStatus(QueueEntryStatus.CALLED);
+        waitingEntry.setServedByMember(teamMember); // Chamado pelo Zé (STAFF)
+
+        TeamMember ownerMember = TeamMember.builder()
+                .id("owner-999")
+                .business(business)
+                .role(TeamRole.OWNER)
+                .isActive(true)
+                .build();
+
+        when(queueEntryRepository.findActiveEntriesBySessionId(SESSION_ID)).thenReturn(List.of(waitingEntry));
+        when(teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue("owner-user-id", business.getId()))
+                .thenReturn(Optional.of(ownerMember));
+
+        // Act & Assert
+        assertThatThrownBy(() -> queueEntryService.startService(SESSION_ID, ENTRY_ID, "owner-user-id"))
+                .isInstanceOf(AppException.class)
+                .hasMessage("You can only manage the clients you are currently serving.")
+                .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        verify(queueEntryRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Should throw bad request exception when entry status is neither WAITING nor CALLED")
     void testStartService_InvalidStatus() {
         // Arrange
         waitingEntry.setStatus(QueueEntryStatus.FINISHED);
+        waitingEntry.setServedByMember(teamMember);
         when(queueEntryRepository.findActiveEntriesBySessionId(SESSION_ID)).thenReturn(List.of(waitingEntry));
         when(teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue(BARBER_USER_ID, business.getId())).thenReturn(Optional.of(teamMember));
 
@@ -564,6 +594,7 @@ class QueueEntryServiceTest {
     void testFinishService_Success() {
         // Arrange
         waitingEntry.setStatus(QueueEntryStatus.IN_SERVICE);
+        waitingEntry.setServedByMember(teamMember);
         when(queueEntryRepository.findByIdWithFullGraph(ENTRY_ID)).thenReturn(Optional.of(waitingEntry));
         when(teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue(BARBER_USER_ID, business.getId())).thenReturn(Optional.of(teamMember));
         when(queueEntryRepository.save(any(QueueEntry.class)))
@@ -582,7 +613,8 @@ class QueueEntryServiceTest {
     @Test
     @DisplayName("Should throw bad request exception when attempting to finish a service not IN_SERVICE")
     void testFinishService_InvalidStatus() {
-        // Arrange:
+        // Arrange
+        waitingEntry.setServedByMember(teamMember);
         when(queueEntryRepository.findByIdWithFullGraph(ENTRY_ID)).thenReturn(Optional.of(waitingEntry));
         when(teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue(BARBER_USER_ID, business.getId())).thenReturn(Optional.of(teamMember));
 
@@ -603,7 +635,6 @@ class QueueEntryServiceTest {
     void testCancelEntry_ByClient_Success() {
         // Arrange
         when(queueEntryRepository.findByIdWithFullGraph(ENTRY_ID)).thenReturn(Optional.of(waitingEntry));
-        when(teamMemberRepository.existsByUserIdAndBusinessIdAndIsActiveTrue(CLIENT_USER_ID, business.getId())).thenReturn(false);
         when(queueEntryRepository.save(any(QueueEntry.class))).thenReturn(waitingEntry);
 
         // Act
@@ -617,11 +648,15 @@ class QueueEntryServiceTest {
     }
 
     @Test
-    @DisplayName("Should allow the barber to cancel a client's entry")
-    void testCancelEntry_ByBarber_Success() {
+    @DisplayName("Should allow STAFF barber to cancel a client they are currently serving")
+    void testCancelEntry_ByBarberServing_Success() {
         // Arrange
+        waitingEntry.setStatus(QueueEntryStatus.CALLED);
+        waitingEntry.setServedByMember(teamMember);
+
         when(queueEntryRepository.findByIdWithFullGraph(ENTRY_ID)).thenReturn(Optional.of(waitingEntry));
-        when(teamMemberRepository.existsByUserIdAndBusinessIdAndIsActiveTrue(BARBER_USER_ID, business.getId())).thenReturn(true);
+        when(teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue(BARBER_USER_ID, business.getId()))
+                .thenReturn(Optional.of(teamMember));
         when(queueEntryRepository.save(any(QueueEntry.class))).thenReturn(waitingEntry);
 
         // Act
@@ -635,17 +670,54 @@ class QueueEntryServiceTest {
     }
 
     @Test
-    @DisplayName("Should throw forbidden exception when user attempting to cancel is neither the barber nor the client")
+    @DisplayName("Should allow OWNER to cancel any client entry even if WAITING")
+    void testCancelEntry_ByOwner_Success() {
+        // Arrange
+        teamMember.setRole(TeamRole.OWNER); // Promove para OWNER no teste
+
+        when(queueEntryRepository.findByIdWithFullGraph(ENTRY_ID)).thenReturn(Optional.of(waitingEntry));
+        when(teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue(BARBER_USER_ID, business.getId()))
+                .thenReturn(Optional.of(teamMember));
+        when(queueEntryRepository.save(any(QueueEntry.class))).thenReturn(waitingEntry);
+
+        // Act
+        queueEntryService.cancelEntry(ENTRY_ID, BARBER_USER_ID);
+
+        // Assert
+        assertThat(waitingEntry.getStatus()).isEqualTo(QueueEntryStatus.CANCELLED);
+        verify(queueEntryRepository).save(waitingEntry);
+    }
+
+    @Test
+    @DisplayName("Should block STAFF from cancelling a client they are not serving")
+    void testCancelEntry_ByStaffNotServing_Forbidden() {
+        // Arrange (waitingEntry está com servedByMember = null e teamMember é STAFF)
+        when(queueEntryRepository.findByIdWithFullGraph(ENTRY_ID)).thenReturn(Optional.of(waitingEntry));
+        when(teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue(BARBER_USER_ID, business.getId()))
+                .thenReturn(Optional.of(teamMember));
+
+        // Act & Assert
+        assertThatThrownBy(() -> queueEntryService.cancelEntry(ENTRY_ID, BARBER_USER_ID))
+                .isInstanceOf(AppException.class)
+                .hasMessage("You can only manage the clients you are currently serving.")
+                .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        verify(queueEntryRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should throw forbidden exception when user attempting to cancel is neither part of the team nor the client")
     void testCancelEntry_Forbidden() {
         // Arrange
         when(queueEntryRepository.findByIdWithFullGraph(ENTRY_ID)).thenReturn(Optional.of(waitingEntry));
         String intruderUserId = "intruder-user-999";
-        when(teamMemberRepository.existsByUserIdAndBusinessIdAndIsActiveTrue(intruderUserId, business.getId())).thenReturn(false);
+        when(teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue(intruderUserId, business.getId()))
+                .thenReturn(Optional.empty());
 
         // Act & Assert
         assertThatThrownBy(() -> queueEntryService.cancelEntry(ENTRY_ID, intruderUserId))
                 .isInstanceOf(AppException.class)
-                .hasMessage("You do not have permission to cancel this entry.")
+                .hasMessage("You do not belong to the team of this business.")
                 .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
 
         verify(queueEntryRepository, never()).save(any());
@@ -659,7 +731,6 @@ class QueueEntryServiceTest {
         // Arrange
         waitingEntry.setStatus(invalidStatus);
         when(queueEntryRepository.findByIdWithFullGraph(ENTRY_ID)).thenReturn(Optional.of(waitingEntry));
-        when(teamMemberRepository.existsByUserIdAndBusinessIdAndIsActiveTrue(CLIENT_USER_ID, business.getId())).thenReturn(false);
 
         // Act & Assert
         assertThatThrownBy(() -> queueEntryService.cancelEntry(ENTRY_ID, CLIENT_USER_ID))
@@ -676,7 +747,6 @@ class QueueEntryServiceTest {
         // Arrange
         waitingEntry.setStatus(QueueEntryStatus.IN_SERVICE);
         when(queueEntryRepository.findByIdWithFullGraph(ENTRY_ID)).thenReturn(Optional.of(waitingEntry));
-        when(teamMemberRepository.existsByUserIdAndBusinessIdAndIsActiveTrue(CLIENT_USER_ID, business.getId())).thenReturn(false);
 
         // Act & Assert
         assertThatThrownBy(() -> queueEntryService.cancelEntry(ENTRY_ID, CLIENT_USER_ID))
