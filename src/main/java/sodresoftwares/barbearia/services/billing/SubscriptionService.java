@@ -34,11 +34,11 @@ public class SubscriptionService {
     @Transactional
     public void createTrialSubscription(Business business) {
         LocalDate today = LocalDate.now();
-        LocalDate trialEnd = today.plusDays(trialDays);
+        LocalDate trialEnd = today.minusDays(1); //alterar data
 
         Subscription subscription = Subscription.builder()
                 .business(business)
-                .status(SubscriptionStatus.TRIAL)
+                .status(SubscriptionStatus.SUSPENDED) // <-- Força o status de bloqueio direto na criação!
                 .paymentProvider(PaymentProvider.ASAAS)
                 .currentPeriodStart(today)
                 .currentPeriodEnd(trialEnd)

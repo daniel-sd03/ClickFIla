@@ -31,7 +31,6 @@ public class DashboardService {
     private final BusinessRepository businessRepository;
     private final QueueSessionRepository queueSessionRepository;
     private final QueueCacheService queueCacheService;
-    private final QueueMapper queueMapper;
     private final TeamInviteRepository teamInviteRepository;
 
     public BusinessDashboardDTO getProfessionalDashboard(User loggedUser) {
