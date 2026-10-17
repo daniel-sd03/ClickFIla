@@ -333,4 +333,33 @@ class BusinessServiceTest {
                 .hasMessage("This business is already active.")
                 .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
     }
+
+    // ==================== DEACTIVATE BUSINESS TESTS ====================
+
+    @Test
+    @DisplayName("Should deactivate user's business successfully via user ID")
+    void testDeactivateMyBusiness_Success() {
+        when(businessRepository.findActiveByUserIdWithUser(USER_ID)).thenReturn(Optional.of(testBusiness));
+        when(queueSessionRepository.existsByBusinessIdAndIsActiveTrue(BUSINESS_ID)).thenReturn(false);
+        when(queueEntryRepository.hasActiveEntriesByBusinessId(BUSINESS_ID)).thenReturn(false);
+
+        businessService.deactivateMyBusiness(USER_ID);
+
+        assertThat(testBusiness.getIsActive()).isFalse();
+        verify(businessRepository).save(testBusiness);
+        verify(teamMemberRepository).deactivateAllByBusinessId(BUSINESS_ID);
+    }
+
+    @Test
+    @DisplayName("Should throw NOT FOUND when user has no active business to deactivate via ID")
+    void testDeactivateMyBusiness_NotFound() {
+        when(businessRepository.findActiveByUserIdWithUser(USER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> businessService.deactivateMyBusiness(USER_ID))
+                .isInstanceOf(AppException.class)
+                .hasMessage("Active business profile not found for this user.")
+                .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+
+        verify(businessRepository, never()).save(any());
+    }
 }

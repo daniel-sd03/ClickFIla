@@ -201,4 +201,18 @@ class BusinessControllerTest {
 
         verify(businessService).reactivateBusiness(any());
     }
+
+    // ==================== PUT DEACTIVATE BUSINESS TESTS ====================
+
+    @Test
+    @DisplayName("PUT /businesses/deactivate -> Should deactivate business and return 200 OK")
+    void testDeactivateBusiness_Success() throws Exception {
+        doNothing().when(businessService).deactivateMyBusiness(any());
+
+        mockMvc.perform(put("/businesses/deactivate")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        verify(businessService).deactivateMyBusiness(any());
+    }
 }
