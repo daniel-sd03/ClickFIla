@@ -48,4 +48,10 @@ public class BusinessController {
         businessService.reactivateBusiness(loggedUser.getId());
         return ResponseEntity.ok().build();
     }
+
+    @PutMapping("/deactivate")
+    public ResponseEntity<Void> deactivateBusiness(@AuthenticationPrincipal User loggedUser) {
+        businessService.deactivateMyBusiness(loggedUser.getId());
+        return ResponseEntity.ok().build();
+    }
 }

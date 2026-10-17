@@ -122,6 +122,19 @@ public class BusinessService {
     }
 
     @Transactional
+    public void deactivateMyBusiness(String userId) {
+        Business business = businessRepository.findActiveByUserIdWithUser(userId)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.NOT_FOUND,
+                        "BUSINESS_NOT_FOUND",
+                        "Active business profile not found for this user."
+                ));
+
+        deactivateBusiness(business);
+    }
+
+
+    @Transactional
     public void deactivateBusiness(Business business) {
         if (queueSessionRepository.existsByBusinessIdAndIsActiveTrue(business.getId())) {
             throw new AppException(
