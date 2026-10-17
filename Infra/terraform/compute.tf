@@ -39,6 +39,9 @@ resource "aws_ecs_service" "clickfila_service" {
   task_definition = aws_ecs_task_definition.dummy_task.arn
   desired_count   = 1
 
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100
+
   # Ignore future changes to the task definition made by GitHub Actions
   lifecycle {
     ignore_changes = [task_definition]
