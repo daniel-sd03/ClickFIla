@@ -35,6 +35,7 @@ public class SubscriptionService {
     public void createTrialSubscription(Business business) {
         LocalDate today = LocalDate.now();
         LocalDate trialEnd = today.minusDays(1); //alterar data
+        // --------------------- REATIVAR TESTE ------------------------//
 
         Subscription subscription = Subscription.builder()
                 .business(business)
