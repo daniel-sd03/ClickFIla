@@ -61,3 +61,10 @@ Thumbs.db
 *.temp
 *.swp
 *~
+
+# ===============================
+# Terraform
+# ===============================
+.terraform/
+*.tfstate
+*.tfstate.backup
