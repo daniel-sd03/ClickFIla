@@ -23,12 +23,14 @@ import sodresoftwares.barbearia.dto.team.TeamInviteResponseDTO;
 import sodresoftwares.barbearia.infra.security.SecurityFilter;
 import sodresoftwares.barbearia.infra.security.SubscriptionCheckInterceptor;
 import sodresoftwares.barbearia.infra.security.WebMvcConfig;
+import sodresoftwares.barbearia.model.billing.SubscriptionStatus;
 import sodresoftwares.barbearia.model.team.TeamRole;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.model.user.UserRole;
 import sodresoftwares.barbearia.services.business.DashboardService;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -96,6 +98,8 @@ class DashboardControllerTest {
                 "inv-1", "biz-123", "Barbearia do Zé", "teste@teste.com", TeamRole.STAFF, Instant.now()
         );
 
+        LocalDate mockEndDate = LocalDate.now().plusDays(30);
+
         BusinessDashboardDTO mockDashboard = new BusinessDashboardDTO(
                 "biz-123",
                 "Barbearia do Zé",
@@ -109,7 +113,9 @@ class DashboardControllerTest {
                 List.of(),
                 List.of(mockInvite),
                 true,
-                true
+                true,
+                SubscriptionStatus.ACTIVE,
+                mockEndDate
         );
 
         when(dashboardService.getProfessionalDashboard(any())).thenReturn(mockDashboard);
@@ -123,6 +129,8 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.loggedMemberRole").value("OWNER"))
                 .andExpect(jsonPath("$.sessionId").value("session-123"))
                 .andExpect(jsonPath("$.pendingInvites[0].id").value("inv-1"))
-                .andExpect(jsonPath("$.emailVerified").value(true));
+                .andExpect(jsonPath("$.emailVerified").value(true))
+                .andExpect(jsonPath("$.subscriptionStatus").value("ACTIVE"))
+                .andExpect(jsonPath("$.currentPeriodEnd").value(mockEndDate.toString()));
     }
 }

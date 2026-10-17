@@ -8,17 +8,20 @@ import sodresoftwares.barbearia.dto.queue.QueueEntryResponseDTO;
 import sodresoftwares.barbearia.dto.team.TeamInviteResponseDTO;
 import sodresoftwares.barbearia.dto.team.TeamMemberDTO;
 import sodresoftwares.barbearia.mappers.QueueMapper;
+import sodresoftwares.barbearia.model.billing.SubscriptionStatus;
 import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.team.InviteStatus;
 import sodresoftwares.barbearia.model.queue.QueueSession;
 import sodresoftwares.barbearia.model.team.TeamMember;
 import sodresoftwares.barbearia.model.user.User;
+import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;
 import sodresoftwares.barbearia.repositories.business.BusinessRepository;
 import sodresoftwares.barbearia.repositories.queue.QueueSessionRepository;
 import sodresoftwares.barbearia.repositories.team.TeamInviteRepository;
 import sodresoftwares.barbearia.repositories.team.TeamMemberRepository;
 import sodresoftwares.barbearia.services.queue.QueueCacheService;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,6 +35,15 @@ public class DashboardService {
     private final QueueSessionRepository queueSessionRepository;
     private final QueueCacheService queueCacheService;
     private final TeamInviteRepository teamInviteRepository;
+    private final SubscriptionRepository subscriptionRepository;
+
+    private record SubInfo(SubscriptionStatus status, LocalDate end) {}
+
+    private SubInfo getSubscriptionInfo(String businessId) {
+        return subscriptionRepository.findByBusinessId(businessId)
+                .map(sub -> new SubInfo(sub.getStatus(), sub.getCurrentPeriodEnd()))
+                .orElse(new SubInfo(null, null));
+    }
 
     public BusinessDashboardDTO getProfessionalDashboard(User loggedUser) {
 
@@ -51,28 +63,32 @@ public class DashboardService {
 
             Optional<Business> ownedBusinessOpt = businessRepository.findByUserId(loggedUser.getId());
 
+
             if (ownedBusinessOpt.isPresent()) {
                 Business inactiveBusiness = ownedBusinessOpt.get();
+                SubInfo subInfo = getSubscriptionInfo(inactiveBusiness.getId());
                 return new BusinessDashboardDTO(
                         inactiveBusiness.getId(), inactiveBusiness.getName(), null, null,
                         null, null, false, null,
                         List.of(), List.of(), pendingInvites,
                         loggedUser.isEmailVerified(),
-                        false
+                        false,
+                        subInfo.status(), subInfo.end()
                 );
             }
 
             return new BusinessDashboardDTO(
                     null, null, null, null,
                     null, null, false, null,
-                    List.of(), List.of(), pendingInvites,
-                    loggedUser.isEmailVerified(), null
+                    List.of(), List.of(), pendingInvites, loggedUser.isEmailVerified(),
+                    null, null ,null
             );
         }
 
         TeamMember loggedMember = loggedMemberOpt.get();
         String businessId = loggedMember.getBusiness().getId();
         String businessName = loggedMember.getBusiness().getName();
+        SubInfo subInfo = getSubscriptionInfo(businessId);
 
         List<TeamMemberDTO> teamDtos = teamMemberRepository.findAllByBusinessIdAndIsActiveTrueWithUser(businessId)
                 .stream()
@@ -89,7 +105,8 @@ public class DashboardService {
                     businessId, businessName, loggedMember.getId(), loggedMember.getRole(),
                     null, null, false, null,
                     List.of(), teamDtos, List.of(),
-                    loggedUser.isEmailVerified(), true
+                    loggedUser.isEmailVerified(), true,
+                    subInfo.status(), subInfo.end()
             );
         }
 
@@ -101,7 +118,8 @@ public class DashboardService {
                 businessId, businessName, loggedMember.getId(), loggedMember.getRole(),
                 session.getId(), session.getTicketCode(), session.getIsActive(),
                 session.getToleranceMinutes(), activeQueueDtos, teamDtos, List.of(),
-                loggedUser.isEmailVerified(), true
+                loggedUser.isEmailVerified(), true,
+                subInfo.status(), subInfo.end()
         );
     }
 }

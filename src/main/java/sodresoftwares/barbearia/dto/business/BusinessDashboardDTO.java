@@ -3,8 +3,10 @@ package sodresoftwares.barbearia.dto.business;
 import sodresoftwares.barbearia.dto.queue.QueueEntryResponseDTO;
 import sodresoftwares.barbearia.dto.team.TeamInviteResponseDTO;
 import sodresoftwares.barbearia.dto.team.TeamMemberDTO;
+import sodresoftwares.barbearia.model.billing.SubscriptionStatus;
 import sodresoftwares.barbearia.model.team.TeamRole;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public record BusinessDashboardDTO(
@@ -20,5 +22,7 @@ public record BusinessDashboardDTO(
         List<TeamMemberDTO> team,
         List<TeamInviteResponseDTO> pendingInvites,
         boolean emailVerified,
-        Boolean businessIsActive
+        Boolean businessIsActive,
+        SubscriptionStatus subscriptionStatus,
+        LocalDate currentPeriodEnd
 ) {}
