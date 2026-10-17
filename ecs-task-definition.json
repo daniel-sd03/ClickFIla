@@ -3,7 +3,7 @@
   "requiresCompatibilities": ["EC2"],
   "networkMode": "bridge",
   "cpu": "1536",
-  "memory": "768",
+  "memory": "1536",
   "containerDefinitions": [
     {
       "name": "api",
