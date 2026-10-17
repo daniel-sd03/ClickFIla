@@ -170,6 +170,8 @@ class DashboardServiceTest {
                 .isActive(true)
                 .build();
 
+        when(teamInviteRepository.findAllByEmailAndStatusWithBusiness(mockUser.getLogin(), InviteStatus.PENDING))
+                .thenReturn(List.of());
         when(teamMemberRepository.findActiveByUserIdWithBusiness(LOGGED_USER_ID)).thenReturn(Optional.of(teamMember));
         when(teamMemberRepository.findAllByBusinessIdAndIsActiveTrueWithUser(BUSINESS_ID))
                 .thenReturn(List.of(teamMember, shadowMember));
@@ -190,6 +192,8 @@ class DashboardServiceTest {
     @DisplayName("Should return business data but no session data when queue session does not exist")
     void getProfessionalDashboard_NoActiveSession() {
         // Arrange
+        when(teamInviteRepository.findAllByEmailAndStatusWithBusiness(mockUser.getLogin(), InviteStatus.PENDING))
+                .thenReturn(List.of());
         when(teamMemberRepository.findActiveByUserIdWithBusiness(LOGGED_USER_ID)).thenReturn(Optional.of(teamMember));
         when(teamMemberRepository.findAllByBusinessIdAndIsActiveTrueWithUser(BUSINESS_ID)).thenReturn(List.of(teamMember));
         when(queueSessionRepository.findByBusinessIdWithBusiness(BUSINESS_ID)).thenReturn(Optional.empty());
@@ -226,6 +230,8 @@ class DashboardServiceTest {
         );
 
         // Arrange
+        when(teamInviteRepository.findAllByEmailAndStatusWithBusiness(mockUser.getLogin(), InviteStatus.PENDING))
+                .thenReturn(List.of());
         when(teamMemberRepository.findActiveByUserIdWithBusiness(LOGGED_USER_ID)).thenReturn(Optional.of(teamMember));
         when(teamMemberRepository.findAllByBusinessIdAndIsActiveTrueWithUser(BUSINESS_ID)).thenReturn(List.of(teamMember));
         when(queueSessionRepository.findByBusinessIdWithBusiness(BUSINESS_ID)).thenReturn(Optional.of(queueSession));

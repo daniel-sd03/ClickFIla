@@ -7,7 +7,6 @@ import sodresoftwares.barbearia.dto.business.BusinessDashboardDTO;
 import sodresoftwares.barbearia.dto.queue.QueueEntryResponseDTO;
 import sodresoftwares.barbearia.dto.team.TeamInviteResponseDTO;
 import sodresoftwares.barbearia.dto.team.TeamMemberDTO;
-import sodresoftwares.barbearia.mappers.QueueMapper;
 import sodresoftwares.barbearia.model.billing.SubscriptionStatus;
 import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.team.InviteStatus;
@@ -47,20 +46,20 @@ public class DashboardService {
 
     public BusinessDashboardDTO getProfessionalDashboard(User loggedUser) {
 
+        List<TeamInviteResponseDTO> pendingInvites = teamInviteRepository.findAllByEmailAndStatusWithBusiness(loggedUser.getLogin(), InviteStatus.PENDING)
+                .stream()
+                .map(invite -> new TeamInviteResponseDTO(
+                        invite.getId(),
+                        invite.getBusiness().getId(),
+                        invite.getBusiness().getName(),
+                        invite.getEmail(),
+                        invite.getRole(),
+                        invite.getExpiresAt()
+                )).toList();
+
         Optional<TeamMember> loggedMemberOpt = teamMemberRepository.findActiveByUserIdWithBusiness(loggedUser.getId());
 
         if (loggedMemberOpt.isEmpty()) {
-            List<TeamInviteResponseDTO> pendingInvites = teamInviteRepository.findAllByEmailAndStatusWithBusiness(loggedUser.getLogin(), InviteStatus.PENDING)
-                    .stream()
-                    .map(invite -> new TeamInviteResponseDTO(
-                            invite.getId(),
-                            invite.getBusiness().getId(),
-                            invite.getBusiness().getName(),
-                            invite.getEmail(),
-                            invite.getRole(),
-                            invite.getExpiresAt()
-                    )).toList();
-
             Optional<Business> ownedBusinessOpt = businessRepository.findByUserId(loggedUser.getId());
 
 
@@ -104,7 +103,7 @@ public class DashboardService {
             return new BusinessDashboardDTO(
                     businessId, businessName, loggedMember.getId(), loggedMember.getRole(),
                     null, null, false, null,
-                    List.of(), teamDtos, List.of(),
+                    List.of(), teamDtos, pendingInvites,
                     loggedUser.isEmailVerified(), true,
                     subInfo.status(), subInfo.end()
             );
@@ -117,7 +116,7 @@ public class DashboardService {
         return new BusinessDashboardDTO(
                 businessId, businessName, loggedMember.getId(), loggedMember.getRole(),
                 session.getId(), session.getTicketCode(), session.getIsActive(),
-                session.getToleranceMinutes(), activeQueueDtos, teamDtos, List.of(),
+                session.getToleranceMinutes(), activeQueueDtos, teamDtos, pendingInvites,
                 loggedUser.isEmailVerified(), true,
                 subInfo.status(), subInfo.end()
         );
