@@ -38,57 +38,60 @@ public class SecurityConfigurations {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
 
-                                // ==========================================
-                                // 1. PUBLIC ENDPOINTS (No authentication required)
-                                // ==========================================
-                                .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/users/client").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/users/professional").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/auth/password-resets").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/auth/password-resets/validate").permitAll()
-                                .requestMatchers(HttpMethod.PATCH, "/auth/passwords").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/auth/reactivate").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/webhooks/asaas").permitAll()
-                                .requestMatchers("/oauth2/**", "/barbearia/oauth2/**").permitAll()
-                                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                                .requestMatchers("/error").permitAll()
-                                .requestMatchers("/ws/**").permitAll()
-                                .requestMatchers("/actuator/**").permitAll()
+                        // ==========================================
+                        // 1. PUBLIC ENDPOINTS (No authentication required)
+                        // ==========================================
+                        .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/users/client").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/users/professional").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/password-resets").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/password-resets/validate").permitAll()
+                        .requestMatchers(HttpMethod.PATCH, "/auth/passwords").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/reactivate").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/webhooks/asaas").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/plans").permitAll() // <-- ROTA DE PLANOS PÚBLICA
+                        .requestMatchers("/oauth2/**", "/barbearia/oauth2/**").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/error").permitAll()
+                        .requestMatchers("/ws/**").permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
 
-                                // ==========================================
-                                // 2. PROFESSIONAL ONLY ENDPOINTS
-                                // ==========================================
-                                // Business Management
-                                .requestMatchers(HttpMethod.POST, "/businesses").hasRole("PROFESSIONAL")
-                                .requestMatchers(HttpMethod.GET, "/businesses/me").hasRole("PROFESSIONAL")
-                                .requestMatchers(HttpMethod.PATCH, "/businesses/me").hasRole("PROFESSIONAL")
-                                .requestMatchers(HttpMethod.POST, "/subscriptions/checkout").hasRole("PROFESSIONAL")
-                                .requestMatchers(HttpMethod.POST, "/subscriptions/cancel/*").hasRole("PROFESSIONAL")
-                                .requestMatchers(HttpMethod.GET, "/subscriptions/me").hasRole("PROFESSIONAL")
+                        // ==========================================
+                        // 2. PROFESSIONAL ONLY ENDPOINTS
+                        // ==========================================
+                        // Business Management
+                        .requestMatchers(HttpMethod.POST, "/businesses").hasRole("PROFESSIONAL")
+                        .requestMatchers(HttpMethod.GET, "/businesses/me").hasRole("PROFESSIONAL")
+                        .requestMatchers(HttpMethod.PATCH, "/businesses/me").hasRole("PROFESSIONAL")
+                        .requestMatchers(HttpMethod.PUT, "/businesses/deactivate").hasRole("PROFESSIONAL") // <-- NOVA ROTA
+                        .requestMatchers(HttpMethod.PUT, "/businesses/reactivate").hasRole("PROFESSIONAL") // <-- NOVA ROTA
+                        .requestMatchers(HttpMethod.POST, "/subscriptions/checkout").hasRole("PROFESSIONAL")
+                        .requestMatchers(HttpMethod.POST, "/subscriptions/cancel/*").hasRole("PROFESSIONAL")
+                        .requestMatchers(HttpMethod.GET, "/subscriptions/me").hasRole("PROFESSIONAL")
 
-                                // Dashboard
-                                .requestMatchers(HttpMethod.GET, "/dashboard/professional").hasRole("PROFESSIONAL")
+                        // Dashboard
+                        .requestMatchers(HttpMethod.GET, "/dashboard/professional").hasRole("PROFESSIONAL")
 
-                                // Queue Session Management
-                                .requestMatchers(HttpMethod.POST, "/queue-sessions").hasRole("PROFESSIONAL")
-                                .requestMatchers(HttpMethod.POST, "/queue-sessions/me/ticket-code").hasRole("PROFESSIONAL")
-                                .requestMatchers(HttpMethod.PATCH, "/queue-sessions/me").hasRole("PROFESSIONAL")
-                                .requestMatchers(HttpMethod.PATCH, "/queue-sessions/me/status").hasRole("PROFESSIONAL")
+                        // Queue Session Management
+                        .requestMatchers(HttpMethod.POST, "/queue-sessions").hasRole("PROFESSIONAL")
+                        .requestMatchers(HttpMethod.POST, "/queue-sessions/me/ticket-code").hasRole("PROFESSIONAL")
+                        .requestMatchers(HttpMethod.PATCH, "/queue-sessions/me").hasRole("PROFESSIONAL")
+                        .requestMatchers(HttpMethod.PATCH, "/queue-sessions/me/status").hasRole("PROFESSIONAL")
 
-                                // Queue Entry Management
-                                .requestMatchers(HttpMethod.POST, "/queue-entries/sessions/*/next").hasRole("PROFESSIONAL")
-                                .requestMatchers(HttpMethod.PATCH, "/queue-entries/*/start").hasRole("PROFESSIONAL")
-                                .requestMatchers(HttpMethod.PATCH, "/queue-entries/*/finish").hasRole("PROFESSIONAL")
-                                .requestMatchers(HttpMethod.PATCH, "/queue-entries/*/requeue").hasRole("PROFESSIONAL")
+                        // Queue Entry Management
+                        .requestMatchers(HttpMethod.POST, "/queue-entries/sessions/*/next").hasRole("PROFESSIONAL")
+                        .requestMatchers(HttpMethod.PATCH, "/queue-entries/*/start").hasRole("PROFESSIONAL")
+                        .requestMatchers(HttpMethod.PATCH, "/queue-entries/*/finish").hasRole("PROFESSIONAL")
+                        .requestMatchers(HttpMethod.PATCH, "/queue-entries/*/requeue").hasRole("PROFESSIONAL")
 
-                                // User Role Management
-                                .requestMatchers(HttpMethod.PATCH, "/users/me/downgrade-to-client").hasRole("PROFESSIONAL")
+                        // User Role Management
+                        .requestMatchers(HttpMethod.PATCH, "/users/me/downgrade-to-client").hasRole("PROFESSIONAL")
 
-                                // ==========================================
-                                // 3. ANY OTHER REQUEST
-                                // ==========================================
-                                .anyRequest().authenticated()
+                        // ==========================================
+                        // 3. ANY OTHER REQUEST
+                        // ==========================================
+                        .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(oAuth2AuthenticationSuccessHandler)
