@@ -61,7 +61,7 @@ public class PaymentWebhookService {
 
         switch (event) {
             case "PAYMENT_CREATED" -> handlePaymentCreated(paymentData);
-            case "PAYMENT_RECEIVED", "PAYMENT_CONFIRMED" -> handlePaymentPaid(gatewayInvoiceId);
+            case "PAYMENT_RECEIVED", "PAYMENT_CONFIRMED" -> handlePaymentPaid(gatewayInvoiceId, paymentData);
             case "PAYMENT_OVERDUE" -> handlePaymentOverdue(gatewayInvoiceId);
             case "PAYMENT_REFUNDED", "PAYMENT_CHARGEBACK_REQUESTED" -> handlePaymentRefunded(gatewayInvoiceId);
             case "PAYMENT_DELETED", "PAYMENT_BANK_SLIP_CANCELLED", "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED" -> handlePaymentCancelled(gatewayInvoiceId);
@@ -114,13 +114,22 @@ public class PaymentWebhookService {
         log.info("Payment PENDING created for invoice {}", gatewayInvoiceId);
     }
 
-    private void handlePaymentPaid(String gatewayInvoiceId) {
+    private void handlePaymentPaid(String gatewayInvoiceId, Map<String, Object> paymentData) {
         Payment payment = paymentRepository.findByGatewayInvoiceId(gatewayInvoiceId)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "PAYMENT_NOT_FOUND", "Payment not found."));
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.NOT_FOUND,
+                        "PAYMENT_NOT_FOUND",
+                        "Payment not found."
+                ));
 
         if (payment.getStatus() == PaymentStatus.PAID) {
             log.debug("Payment {} is already PAID. Ignoring.", gatewayInvoiceId);
             return;
+        }
+
+        String asaasBillingType = (String) paymentData.get("billingType");
+        if (asaasBillingType != null) {
+            payment.setPaymentMethod(mapAsaasBillingType(asaasBillingType));
         }
 
         payment.setStatus(PaymentStatus.PAID);
@@ -208,5 +217,14 @@ public class PaymentWebhookService {
 
     private void handleSubscriptionUpdated(String businessId, String event) {
         log.info("Subscription event {} registered successfully for business {}.", event, businessId);
+    }
+
+    private PaymentMethod mapAsaasBillingType(String asaasBillingType) {
+        if (asaasBillingType == null) return null;
+        return switch (asaasBillingType.toUpperCase()) {
+            case "PIX" -> PaymentMethod.PIX;
+            case "CREDIT_CARD" -> PaymentMethod.CREDIT_CARD;
+            default -> null;
+        };
     }
 }
