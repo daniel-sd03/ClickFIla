@@ -8,10 +8,6 @@ import sodresoftwares.barbearia.model.business.Business;
 import java.util.Optional;
 
 public interface BusinessRepository extends JpaRepository<Business, String> {
-    @Query("SELECT b FROM Business b " +
-            "JOIN FETCH b.user " +
-            "WHERE b.user.id = :userId")
-    Optional<Business> findByUserIdWithUser(@Param("userId") String userId);
 
     @Query("SELECT b FROM Business b " +
             "JOIN FETCH b.user " +
@@ -20,6 +16,4 @@ public interface BusinessRepository extends JpaRepository<Business, String> {
     Optional<Business> findActiveByUserIdWithUser(@Param("userId") String userId);
 
     Optional<Business> findByUserId(String userId);
-
-    boolean existsByUserId(String userId);
 }
