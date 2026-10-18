@@ -32,7 +32,7 @@ public class TokenService {
                     .withClaim("user_id", user.getId())
                     .withClaim("role", user.getRole().name())
                     .withClaim("lgpd_version", lgpdVersion)
-                    .withClaim("email_verified", user.isEmailVerified())
+                    .withClaim("email_verified", user.getEmailVerified())
                     .withExpiresAt(genExpirationDate())
                     .sign(algorithm);
         } catch (JWTCreationException ex) {
@@ -61,12 +61,14 @@ public class TokenService {
         String login = decodedJWT.getSubject();
         String userId = decodedJWT.getClaim("user_id").asString();
         String roleString = decodedJWT.getClaim("role").asString();
+        Boolean emailVerified = decodedJWT.getClaim("email_verified").asBoolean();
 
         if (userId != null && roleString != null) {
             User authenticatedUser = User.builder()
                     .id(userId)
                     .login(login)
                     .role(UserRole.valueOf(roleString))
+                    .emailVerified(emailVerified != null ? emailVerified : false)
                     .build();
 
             return new UsernamePasswordAuthenticationToken(

@@ -1,6 +1,7 @@
 package sodresoftwares.barbearia.services.business;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.jpa.repository.support.SimpleJpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import sodresoftwares.barbearia.dto.business.BusinessDashboardDTO;
@@ -18,6 +19,7 @@ import sodresoftwares.barbearia.repositories.business.BusinessRepository;
 import sodresoftwares.barbearia.repositories.queue.QueueSessionRepository;
 import sodresoftwares.barbearia.repositories.team.TeamInviteRepository;
 import sodresoftwares.barbearia.repositories.team.TeamMemberRepository;
+import sodresoftwares.barbearia.repositories.user.UserRepository;
 import sodresoftwares.barbearia.services.queue.QueueCacheService;
 
 import java.time.LocalDate;
@@ -35,6 +37,7 @@ public class DashboardService {
     private final QueueCacheService queueCacheService;
     private final TeamInviteRepository teamInviteRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final UserRepository userRepository;
 
     private record SubInfo(SubscriptionStatus status, LocalDate end) {}
 
@@ -70,7 +73,7 @@ public class DashboardService {
                         inactiveBusiness.getId(), inactiveBusiness.getName(), null, null,
                         null, null, false, null,
                         List.of(), List.of(), pendingInvites,
-                        loggedUser.isEmailVerified(),
+                        loggedUser.getEmailVerified(),
                         false,
                         subInfo.status(), subInfo.end()
                 );
@@ -79,7 +82,7 @@ public class DashboardService {
             return new BusinessDashboardDTO(
                     null, null, null, null,
                     null, null, false, null,
-                    List.of(), List.of(), pendingInvites, loggedUser.isEmailVerified(),
+                    List.of(), List.of(), pendingInvites, loggedUser.getEmailVerified(),
                     null, null ,null
             );
         }
@@ -104,7 +107,7 @@ public class DashboardService {
                     businessId, businessName, loggedMember.getId(), loggedMember.getRole(),
                     null, null, false, null,
                     List.of(), teamDtos, pendingInvites,
-                    loggedUser.isEmailVerified(), true,
+                    loggedUser.getEmailVerified(), true,
                     subInfo.status(), subInfo.end()
             );
         }
@@ -117,8 +120,9 @@ public class DashboardService {
                 businessId, businessName, loggedMember.getId(), loggedMember.getRole(),
                 session.getId(), session.getTicketCode(), session.getIsActive(),
                 session.getToleranceMinutes(), activeQueueDtos, teamDtos, pendingInvites,
-                loggedUser.isEmailVerified(), true,
+                loggedUser.getEmailVerified(), true,
                 subInfo.status(), subInfo.end()
         );
+
     }
 }

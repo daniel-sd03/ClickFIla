@@ -60,7 +60,7 @@ public class User implements UserDetails {
 
 	@Builder.Default
 	@Column(name = "email_verified", nullable = false)
-	private boolean emailVerified = false;
+	private Boolean emailVerified = false;
 
 	@Column(name = "deleted_at")
 	private Instant deletedAt;

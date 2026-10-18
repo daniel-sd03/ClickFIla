@@ -2,6 +2,7 @@ package sodresoftwares.barbearia.infra.security;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -121,8 +122,9 @@ class TokenServiceTest {
     void shouldReturnAuthenticationFromDecodedJWT() {
         // Arrange
         DecodedJWT decodedJWT = mock(DecodedJWT.class);
-        com.auth0.jwt.interfaces.Claim userIdClaim = mock(com.auth0.jwt.interfaces.Claim.class);
-        com.auth0.jwt.interfaces.Claim roleClaim = mock(com.auth0.jwt.interfaces.Claim.class);
+        Claim userIdClaim = mock(Claim.class);
+        Claim roleClaim = mock(Claim.class);
+        Claim emailVerifiedClaim = mock(Claim.class);
 
         when(decodedJWT.getSubject()).thenReturn("test@example.com");
 
@@ -131,6 +133,9 @@ class TokenServiceTest {
 
         when(decodedJWT.getClaim("role")).thenReturn(roleClaim);
         when(roleClaim.asString()).thenReturn("USER");
+
+        when(decodedJWT.getClaim("email_verified")).thenReturn(emailVerifiedClaim);
+        when(emailVerifiedClaim.asBoolean()).thenReturn(true);
 
         // Act
         UsernamePasswordAuthenticationToken auth = tokenService.getAuthentication(decodedJWT);
@@ -141,5 +146,6 @@ class TokenServiceTest {
         assertThat(authUser.getId()).isEqualTo("user-123");
         assertThat(authUser.getLogin()).isEqualTo("test@example.com");
         assertThat(authUser.getRole().name()).isEqualTo("USER");
+        assertThat(authUser.getEmailVerified()).isTrue();
     }
 }
