@@ -612,7 +612,7 @@ class UserServiceTest {
 
         userService.verifyEmail(USER_ID, "123456");
 
-        assertThat(testUser.isEmailVerified()).isTrue();
+        assertThat(testUser.getEmailVerified()).isTrue();
         verify(userRepository).save(testUser);
     }
 

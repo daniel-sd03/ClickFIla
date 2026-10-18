@@ -96,7 +96,7 @@ public class UserService {
         user.setRole(UserRole.PROFESSIONAL);
         User savedUser = userRepository.save(user);
 
-        if (!savedUser.isEmailVerified()) {
+        if (!savedUser.getEmailVerified()) {
             generateAndSendOtp(savedUser);
             log.info("Verification email sent");
         }
@@ -248,7 +248,7 @@ public class UserService {
     public void resendVerificationEmail(String userId) {
         User user = getUserById(userId);
 
-        if (user.isEmailVerified()) {
+        if (user.getEmailVerified()) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
                     "ALREADY_VERIFIED",

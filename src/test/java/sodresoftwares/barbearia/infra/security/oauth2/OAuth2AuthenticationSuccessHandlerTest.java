@@ -133,7 +133,7 @@ class OAuth2AuthenticationSuccessHandlerTest {
         verify(userRepository).save(standardUser);
         verify(tokenService).generateToken(standardUser, fakeLgpdVersion);
 
-        assertTrue(standardUser.isEmailVerified());
+        assertTrue(standardUser.getEmailVerified());
         assertCookieAndRedirect();
     }
 
@@ -161,7 +161,7 @@ class OAuth2AuthenticationSuccessHandlerTest {
         assertEquals(email, newUser.getLogin());
         assertEquals(googleId, newUser.getGoogleId());
         assertEquals(UserRole.USER, newUser.getRole());
-        assertTrue(newUser.isEmailVerified());
+        assertTrue(newUser.getEmailVerified());
         assertNotNull(newUser.getPassword());
 
         verify(userRepository).save(newUser);
