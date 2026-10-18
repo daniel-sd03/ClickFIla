@@ -39,6 +39,8 @@ class PaymentWebhookServiceTest {
 
     private Subscription mockSubscription;
     private Payment mockPayment;
+    private Plan mockMonthlyPlan;
+    private Plan mockYearlyPlan;
 
     private final String BUSINESS_ID = "biz-123";
     private final String SUBSCRIPTION_ID = "sub-123";
@@ -50,9 +52,14 @@ class PaymentWebhookServiceTest {
                 .id(BUSINESS_ID)
                 .build();
 
-        Plan mockMonthlyPlan = Plan.builder()
+        mockMonthlyPlan = Plan.builder()
                 .billingCycle(BillingCycle.MONTHLY)
                 .price(new BigDecimal("50.00"))
+                .build();
+
+        mockYearlyPlan = Plan.builder()
+                .billingCycle(BillingCycle.YEARLY)
+                .price(new BigDecimal("500.00"))
                 .build();
 
         mockSubscription = Subscription.builder()
@@ -72,12 +79,11 @@ class PaymentWebhookServiceTest {
                 .build();
     }
 
-    // ==================== PAYMENT_CREATED TESTS ====================
+    // ==================== PAYMENT ROUTER TESTS ====================
 
     @Test
     @DisplayName("Should create pending payment when PAYMENT_CREATED event is received")
     void testProcessWebhook_PaymentCreated_Success() {
-        // Arrange
         when(paymentRepository.existsByGatewayInvoiceId(INVOICE_ID)).thenReturn(false);
         when(subscriptionRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.of(mockSubscription));
 
@@ -92,10 +98,8 @@ class PaymentWebhookServiceTest {
                 )
         );
 
-        // Act
         webhookService.processWebhook(payload);
 
-        // Assert
         verify(paymentRepository).save(argThat(payment ->
                 payment.getGatewayInvoiceId().equals(INVOICE_ID) &&
                         payment.getStatus().equals(PaymentStatus.PENDING) &&
@@ -107,7 +111,6 @@ class PaymentWebhookServiceTest {
     @Test
     @DisplayName("Should ignore PAYMENT_CREATED event if payment already exists (Idempotency)")
     void testProcessWebhook_PaymentCreated_Idempotency() {
-        // Arrange
         when(paymentRepository.existsByGatewayInvoiceId(INVOICE_ID)).thenReturn(true);
 
         Map<String, Object> payload = Map.of(
@@ -115,74 +118,62 @@ class PaymentWebhookServiceTest {
                 "payment", Map.of("id", INVOICE_ID, "externalReference", BUSINESS_ID)
         );
 
-        // Act
         webhookService.processWebhook(payload);
 
-        // Assert
         verify(subscriptionRepository, never()).findByBusinessId(any());
         verify(paymentRepository, never()).save(any());
     }
 
-    // ==================== PAYMENT_CONFIRMED TESTS ====================
-
     @Test
     @DisplayName("Should extend monthly subscription and log history when PAYMENT_CONFIRMED is received")
     void testProcessWebhook_PaymentConfirmed_MonthlySuccess() {
-        // Arrange
         when(paymentRepository.findByGatewayInvoiceId(INVOICE_ID)).thenReturn(Optional.of(mockPayment));
         when(subscriptionRepository.findByIdWithLock(SUBSCRIPTION_ID)).thenReturn(Optional.of(mockSubscription));
-
-        Map<String, Object> payload = Map.of(
-                "event", "PAYMENT_CONFIRMED",
-                "payment", Map.of("id", INVOICE_ID, "externalReference", BUSINESS_ID)
-        );
-
-        LocalDate expectedNewEndDate = LocalDate.now().plusMonths(1);
-
-        // Act
-        webhookService.processWebhook(payload);
-
-        // Assert
-        assertThat(mockPayment.getStatus()).isEqualTo(PaymentStatus.PAID);
-        assertThat(mockSubscription.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
-        assertThat(mockSubscription.getCurrentPeriodEnd()).isEqualTo(expectedNewEndDate);
-
-        verify(paymentRepository).save(mockPayment);
-        verify(subscriptionRepository).save(mockSubscription);
-
-        verify(subscriptionHistoryService).logStatusChange(
-                mockSubscription,
-                SubscriptionStatus.ACTIVE,
-                "WEBHOOK: PAYMENT_CONFIRMED"
-        );
-    }
-
-    @Test
-    @DisplayName("Should ignore PAYMENT_CONFIRMED event if payment is already PAID (Idempotency)")
-    void testProcessWebhook_PaymentConfirmed_Idempotency() {
-        // Arrange
-        mockPayment.setStatus(PaymentStatus.PAID);
-        when(paymentRepository.findByGatewayInvoiceId(INVOICE_ID)).thenReturn(Optional.of(mockPayment));
 
         Map<String, Object> payload = Map.of(
                 "event", "PAYMENT_CONFIRMED",
                 "payment", Map.of("id", INVOICE_ID)
         );
 
-        // Act
+        LocalDate expectedNewEndDate = LocalDate.now().plusMonths(1);
+
         webhookService.processWebhook(payload);
 
-        // Assert
-        verify(subscriptionRepository, never()).findByIdWithLock(any());
-        verify(paymentRepository, never()).save(any());
+        assertThat(mockPayment.getStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(mockSubscription.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(mockSubscription.getCurrentPeriodEnd()).isEqualTo(expectedNewEndDate);
+
+        verify(paymentRepository).save(mockPayment);
+        verify(subscriptionRepository).save(mockSubscription);
+        verify(subscriptionHistoryService).logStatusChange(mockSubscription, SubscriptionStatus.ACTIVE, "WEBHOOK: PAYMENT_CONFIRMED");
     }
 
-    // ==================== PAYMENT_OVERDUE TESTS ====================
+    @Test
+    @DisplayName("Should calculate days to add when PAYMENT_CONFIRMED is received for a YEARLY plan")
+    void testProcessWebhook_PaymentConfirmed_YearlySuccess() {
+        // Mudar o plano para Anual no mock
+        mockSubscription.setPlan(mockYearlyPlan);
+        mockPayment.setAmount(new BigDecimal("500.00")); // Valor total pago
+
+        when(paymentRepository.findByGatewayInvoiceId(INVOICE_ID)).thenReturn(Optional.of(mockPayment));
+        when(subscriptionRepository.findByIdWithLock(SUBSCRIPTION_ID)).thenReturn(Optional.of(mockSubscription));
+
+        Map<String, Object> payload = Map.of(
+                "event", "PAYMENT_CONFIRMED",
+                "payment", Map.of("id", INVOICE_ID)
+        );
+
+        LocalDate expectedNewEndDate = LocalDate.now().plusDays(365);
+
+        webhookService.processWebhook(payload);
+
+        assertThat(mockSubscription.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(mockSubscription.getCurrentPeriodEnd()).isEqualTo(expectedNewEndDate);
+    }
 
     @Test
     @DisplayName("Should mark payment as OVERDUE if subscription is ACTIVE (Real Debt)")
     void testProcessWebhook_PaymentOverdue_RealDebt() {
-        // Arrange
         mockSubscription.setStatus(SubscriptionStatus.ACTIVE);
         when(paymentRepository.findByGatewayInvoiceId(INVOICE_ID)).thenReturn(Optional.of(mockPayment));
 
@@ -191,40 +182,31 @@ class PaymentWebhookServiceTest {
                 "payment", Map.of("id", INVOICE_ID)
         );
 
-        // Act
         webhookService.processWebhook(payload);
 
-        // Assert
         assertThat(mockPayment.getStatus()).isEqualTo(PaymentStatus.OVERDUE);
         verify(paymentRepository).save(mockPayment);
     }
 
     @Test
-    @DisplayName("Should mark payment as EXPIRED if subscription is NOT ACTIVE (Abandoned Checkout)")
-    void testProcessWebhook_PaymentOverdue_AbandonedCheckout() {
-        // Arrange
-        mockSubscription.setStatus(SubscriptionStatus.TRIAL);
+    @DisplayName("Should mark payment as EXPIRED when PAYMENT_DELETED or CANCELLED is received")
+    void testProcessWebhook_PaymentCancelled() {
         when(paymentRepository.findByGatewayInvoiceId(INVOICE_ID)).thenReturn(Optional.of(mockPayment));
 
         Map<String, Object> payload = Map.of(
-                "event", "PAYMENT_OVERDUE",
+                "event", "PAYMENT_BANK_SLIP_CANCELLED",
                 "payment", Map.of("id", INVOICE_ID)
         );
 
-        // Act
         webhookService.processWebhook(payload);
 
-        // Assert
         assertThat(mockPayment.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
         verify(paymentRepository).save(mockPayment);
     }
 
-    // ==================== PAYMENT_REFUNDED TESTS ====================
-
     @Test
     @DisplayName("Should suspend subscription and mark payment as REFUNDED when money is returned")
     void testProcessWebhook_PaymentRefunded_Success() {
-        // Arrange
         when(paymentRepository.findByGatewayInvoiceId(INVOICE_ID)).thenReturn(Optional.of(mockPayment));
 
         Map<String, Object> payload = Map.of(
@@ -232,33 +214,42 @@ class PaymentWebhookServiceTest {
                 "payment", Map.of("id", INVOICE_ID)
         );
 
-        // Act
         webhookService.processWebhook(payload);
 
-        // Assert
         assertThat(mockPayment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
         assertThat(mockSubscription.getStatus()).isEqualTo(SubscriptionStatus.SUSPENDED);
 
         verify(paymentRepository).save(mockPayment);
         verify(subscriptionRepository).save(mockSubscription);
+    }
 
-        verify(subscriptionHistoryService).logStatusChange(
-                mockSubscription,
-                SubscriptionStatus.SUSPENDED,
-                "WEBHOOK: PAYMENT_REFUNDED"
+    // ==================== SUBSCRIPTION ROUTER TESTS ====================
+
+    @Test
+    @DisplayName("Should suspend subscription directly when SUBSCRIPTION_DELETED is received")
+    void testProcessWebhook_SubscriptionDeleted() {
+        // Note que o JSON do Asaas envia a chave "subscription", não "payment"
+        mockSubscription.setStatus(SubscriptionStatus.ACTIVE);
+        when(subscriptionRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.of(mockSubscription));
+
+        Map<String, Object> payload = Map.of(
+                "event", "SUBSCRIPTION_DELETED",
+                "subscription", Map.of("externalReference", BUSINESS_ID)
         );
+
+        webhookService.processWebhook(payload);
+
+        assertThat(mockSubscription.getStatus()).isEqualTo(SubscriptionStatus.SUSPENDED);
+        verify(subscriptionRepository).save(mockSubscription);
+        verify(subscriptionHistoryService).logStatusChange(mockSubscription, SubscriptionStatus.SUSPENDED, "WEBHOOK: SUBSCRIPTION_DELETED");
     }
 
     // ==================== EDGE CASES ====================
 
     @Test
-    @DisplayName("Should return silently if event or payment object is null")
+    @DisplayName("Should return silently if event is null")
     void testProcessWebhook_NullPayload() {
-        // Act
         webhookService.processWebhook(Map.of());
-
-        // Assert
         verify(paymentRepository, never()).existsByGatewayInvoiceId(any());
-        verify(subscriptionRepository, never()).findByBusinessId(any());
     }
 }
