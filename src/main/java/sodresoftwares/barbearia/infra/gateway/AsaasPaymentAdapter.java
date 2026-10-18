@@ -116,7 +116,7 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
     private GatewayCheckoutResponse createYearlyCheckout(Business business, Plan plan, String customerId) {
         var requestBody = Map.of(
                 "billingType", "UNDEFINED",
-                "chargeType", "INSTALLMENT",
+                "chargeType", "DETACHED",
                 "name", "Assinatura " + plan.getName() + " (Anual) - " + business.getName(),
                 "description", "Plano anual parcelado em até 12x no cartão.",
                 "value", plan.getPrice(),

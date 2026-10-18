@@ -141,7 +141,7 @@ class AsaasPaymentAdapterTest {
 
         mockServer.expect(requestTo(API_URL + "/paymentLinks"))
                 .andExpect(method(HttpMethod.POST))
-                .andExpect(jsonPath("$.chargeType").value("INSTALLMENT"))
+                .andExpect(jsonPath("$.chargeType").value("DETACHED"))
                 .andExpect(jsonPath("$.maxInstallmentCount").value(12))
                 .andRespond(withSuccess(expectedJsonResponse, MediaType.APPLICATION_JSON));
 
