@@ -7,6 +7,7 @@ public record BusinessResponseDTO(
         String id,
         String name,
         Boolean isActive,
+        String cpfCnpj,
         UserResponseDTO user
 ) {
     public static BusinessResponseDTO fromEntity(Business business) {
@@ -14,6 +15,7 @@ public record BusinessResponseDTO(
                 business.getId(),
                 business.getName(),
                 business.getIsActive(),
+                business.getCpfCnpj(),
                 business.getUser() != null ? UserResponseDTO.fromEntity(business.getUser()) : null
         );
     }
