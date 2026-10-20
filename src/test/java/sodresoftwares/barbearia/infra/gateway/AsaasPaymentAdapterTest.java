@@ -57,7 +57,7 @@ class AsaasPaymentAdapterTest {
                 .id("biz-123")
                 .name("Barbearia Teste")
                 .user(testUser)
-                .cpfCnpj("12345678900")
+                .cpfCnpj("123.456.789-00")
                 .build();
 
         testPlan = Plan.builder()
@@ -75,7 +75,7 @@ class AsaasPaymentAdapterTest {
     // ==================== CREATE CUSTOMER TESTS ====================
 
     @Test
-    @DisplayName("Should create customer and return ID successfully")
+    @DisplayName("Should create customer, remove CPF punctuation and return ID successfully")
     void shouldCreateCustomerSuccessfully() {
         // Arrange
         String expectedJsonResponse = "{\"id\": \"cus_000001\"}";
@@ -84,6 +84,7 @@ class AsaasPaymentAdapterTest {
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("access_token", API_KEY))
                 .andExpect(jsonPath("$.name").value("Barbearia Teste"))
+                .andExpect(jsonPath("$.cpfCnpj").value("12345678900"))
                 .andRespond(withSuccess(expectedJsonResponse, MediaType.APPLICATION_JSON));
 
         // Act
@@ -94,10 +95,29 @@ class AsaasPaymentAdapterTest {
     }
 
     @Test
+    @DisplayName("Should throw Exception when business has no CPF or CNPJ")
+    void shouldThrowWhenCpfIsMissing() {
+        // Arrange
+        Business businessWithoutCpf = Business.builder()
+                .id("biz-456")
+                .name("Barbearia Sem Documento")
+                .cpfCnpj(null) // Documento nulo
+                .build();
+
+        mockServer.reset();
+
+        // Act & Assert
+        assertThatThrownBy(() -> adapter.createOrUpdateCustomer(businessWithoutCpf))
+                .isInstanceOf(AppException.class)
+                .hasMessage("CPF or CNPJ is required to process the payment.")
+                .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     @DisplayName("Should throw Exception when Asaas response does not contain ID on customer creation")
     void shouldThrowWhenCreateCustomerFails() {
         // Arrange
-        String failureJsonResponse = "{\"error\": \"invalid_data\"}"; // Resposta sem ID
+        String failureJsonResponse = "{\"error\": \"invalid_data\"}";
 
         mockServer.expect(requestTo(API_URL + "/customers"))
                 .andRespond(withSuccess(failureJsonResponse, MediaType.APPLICATION_JSON));
@@ -112,7 +132,7 @@ class AsaasPaymentAdapterTest {
     // ==================== SUBSCRIPTION CHECKOUT TESTS ====================
 
     @Test
-    @DisplayName("Should generate MONTHLY checkout link successfully")
+    @DisplayName("Should generate MONTHLY checkout link successfully with dueDateLimitDays")
     void shouldCreateMonthlyCheckout() {
         // Arrange
         String expectedJsonResponse = "{\"id\": \"sub_001\", \"url\": \"https://asaas.com/checkout/123\"}";
@@ -121,6 +141,7 @@ class AsaasPaymentAdapterTest {
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(jsonPath("$.chargeType").value("RECURRENT"))
                 .andExpect(jsonPath("$.customer").value("cus_123"))
+                .andExpect(jsonPath("$.dueDateLimitDays").value(5))
                 .andRespond(withSuccess(expectedJsonResponse, MediaType.APPLICATION_JSON));
 
         // Act
@@ -143,6 +164,7 @@ class AsaasPaymentAdapterTest {
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(jsonPath("$.chargeType").value("DETACHED"))
                 .andExpect(jsonPath("$.maxInstallmentCount").value(12))
+                .andExpect(jsonPath("$.dueDateLimitDays").value(5))
                 .andRespond(withSuccess(expectedJsonResponse, MediaType.APPLICATION_JSON));
 
         // Act
@@ -179,10 +201,9 @@ class AsaasPaymentAdapterTest {
 
         mockServer.expect(requestTo(API_URL + "/paymentLinks/" + gatewaySubscriptionId))
                 .andExpect(method(HttpMethod.DELETE))
-                .andRespond(withNoContent()); // HTTP 204
+                .andRespond(withNoContent());
 
         // Act
         adapter.cancelSubscription(gatewaySubscriptionId);
-
     }
 }
