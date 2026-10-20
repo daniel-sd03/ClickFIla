@@ -92,6 +92,7 @@ class BusinessControllerTest {
                 "biz-123",
                 "New Business Name",
                 true,
+                "12345678909",
                 userDTO
         );
 
@@ -113,7 +114,7 @@ class BusinessControllerTest {
     void testGetMyBusinessProfile_Success() throws Exception {
         // Arrange
         UserResponseDTO mockUserDTO = new UserResponseDTO("user-123", "Barbeiro Zé", "ze@test.com", "3199999999", "PROFESSIONAL");
-        BusinessResponseDTO getResponseDTO = new BusinessResponseDTO("biz-123", "Barbearia do Zé", true, mockUserDTO);
+        BusinessResponseDTO getResponseDTO = new BusinessResponseDTO("biz-123", "Barbearia do Zé", true,"12345678909", mockUserDTO);
 
         when(businessService.getMyBusinessProfile(any())).thenReturn(getResponseDTO);
 
