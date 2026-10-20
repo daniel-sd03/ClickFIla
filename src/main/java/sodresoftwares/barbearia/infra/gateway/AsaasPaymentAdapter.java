@@ -29,10 +29,18 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
 
     @Override
     public String createOrUpdateCustomer(@NonNull Business business) {
+        if (business.getCpfCnpj() == null || business.getCpfCnpj().trim().isEmpty()) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "MISSING_DOCUMENT",
+                    "CPF or CNPJ is required to process the payment."
+            );
+        }
+
         var requestBody = Map.of(
                 "name", business.getName(),
                 "email", business.getUser().getLogin(),
-                "cpfCnpj", business.getCpfCnpj() != null ? business.getCpfCnpj() : "",
+                "cpfCnpj", business.getCpfCnpj().replaceAll("\\D", ""),
                 "externalReference", business.getId()
         );
 
@@ -93,6 +101,7 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
                 "name", "Assinatura " + plan.getName() + " - " + business.getName(),
                 "description", "Acesso completo ao sistema de gestão de filas.",
                 "value", plan.getPrice(),
+                "dueDateLimitDays", 5,
                 "customer", customerId
         );
 
