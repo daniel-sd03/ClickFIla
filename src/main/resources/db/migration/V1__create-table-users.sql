@@ -78,7 +78,8 @@ CREATE TABLE queue_entries
 (
     id                  TEXT PRIMARY KEY NOT NULL,
     queue_sessions_id   TEXT             NOT NULL,
-    user_id             TEXT             NOT NULL,
+    user_id             TEXT,
+    walk_in_name        VARCHAR(100),
     served_by_member_id TEXT,
     service_name        VARCHAR(100)     NOT NULL,
     status              VARCHAR(30)      NOT NULL,

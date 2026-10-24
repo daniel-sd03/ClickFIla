@@ -42,6 +42,15 @@ public class QueueEntryController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/walk-in")
+    public ResponseEntity<QueueEntryResponseDTO> addWalkInClient(
+            @RequestBody @Valid AddWalkInClientDTO dto,
+            @AuthenticationPrincipal User loggedInUser) {
+
+        QueueEntryResponseDTO response = queueEntryService.addWalkInClient(dto, loggedInUser.getId(), dto.actionMemberId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
     @PatchMapping("/{entryId}/requeue")
     public ResponseEntity<QueueEntryResponseDTO> requeueEntry(
             @PathVariable String entryId,

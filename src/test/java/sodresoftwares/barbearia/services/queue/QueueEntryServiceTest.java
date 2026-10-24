@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import sodresoftwares.barbearia.dto.queue.AddWalkInClientDTO;
 import sodresoftwares.barbearia.dto.queue.JoinQueueDTO;
 import sodresoftwares.barbearia.dto.queue.QueueEntryResponseDTO;
 import sodresoftwares.barbearia.dto.queue.UserQueueStatusDTO;
@@ -691,7 +692,7 @@ class QueueEntryServiceTest {
     @Test
     @DisplayName("Should block STAFF from cancelling a client they are not serving")
     void testCancelEntry_ByStaffNotServing_Forbidden() {
-        // Arrange (waitingEntry está com servedByMember = null e teamMember é STAFF)
+        // Arrange (waitingEntry está com servedByMember = null e teamMember é apenas STAFF)
         when(queueEntryRepository.findByIdWithFullGraph(ENTRY_ID)).thenReturn(Optional.of(waitingEntry));
         when(teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue(BARBER_USER_ID, business.getId()))
                 .thenReturn(Optional.of(teamMember));
@@ -699,7 +700,7 @@ class QueueEntryServiceTest {
         // Act & Assert
         assertThatThrownBy(() -> queueEntryService.cancelEntry(ENTRY_ID, BARBER_USER_ID))
                 .isInstanceOf(AppException.class)
-                .hasMessage("You can only manage the clients you are currently serving.")
+                .hasMessage("Only the business owner or the professional attending the client can cancel this entry.")
                 .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
 
         verify(queueEntryRepository, never()).save(any());
@@ -755,5 +756,46 @@ class QueueEntryServiceTest {
                 .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
 
         verify(queueEntryRepository, never()).save(any());
+    }
+
+    // ==================== ADD WALK-IN CLIENT TESTS ====================
+
+    @Test
+    @DisplayName("Should allow staff to add a walk-in client without a user account")
+    void testAddWalkInClient_Success() {
+        // Arrange
+        AddWalkInClientDTO walkInDTO = new AddWalkInClientDTO(SESSION_ID, "Barba", "Senhor Carlos", teamMember.getId());
+
+        QueueEntry expectedSavedEntry = QueueEntry.builder()
+                .id("entry-walkin-999")
+                .queueSession(activeSession)
+                .user(null)
+                .walkInName("Senhor Carlos")
+                .serviceName("Barba")
+                .status(QueueEntryStatus.WAITING)
+                .joinedAt(Instant.now())
+                .build();
+
+        when(queueSessionRepository.findByIdWithBusinessAndUser(SESSION_ID)).thenReturn(Optional.of(activeSession));
+        when(teamMemberRepository.findById(teamMember.getId())).thenReturn(Optional.of(teamMember));
+        when(queueEntryRepository.save(any(QueueEntry.class))).thenReturn(expectedSavedEntry);
+        when(queueEntryRepository.findActiveEntriesBySessionId(SESSION_ID)).thenReturn(List.of(expectedSavedEntry));
+
+        // Act
+        QueueEntryResponseDTO response = queueEntryService.addWalkInClient(walkInDTO, BARBER_USER_ID, teamMember.getId());
+
+        // Assert
+        assertThat(response).isNotNull();
+
+        verify(queueEntryRepository).save(argThat(entry ->
+                entry.getUser() == null &&
+                        "Senhor Carlos".equals(entry.getWalkInName()) &&
+                        "Barba".equals(entry.getServiceName()) &&
+                        entry.getStatus() == QueueEntryStatus.WAITING
+        ));
+
+        verify(queueCacheService).evictSessionList(SESSION_ID);
+        verify(queueNotificationService).notifyQueueUpdate(SESSION_ID);
+        verifyNoInteractions(pushDispatcher);
     }
 }

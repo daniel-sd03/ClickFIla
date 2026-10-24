@@ -32,8 +32,11 @@ public class QueueEntry {
     private QueueSession queueSession;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     private User user;
+
+    @Column(name = "walk_in_name")
+    private String walkInName;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "served_by_member_id")
