@@ -192,6 +192,39 @@ class QueueEntryControllerTest {
                 .andExpect(jsonPath("$.status").value("CALLED"));
     }
 
+    // ==================== POST ADD WALK-IN TESTS ====================
+
+    @Test
+    @DisplayName("POST /queue-entries/walk-in -> Should add walk-in client and return 201 Created")
+    void testAddWalkInClient_Success() throws Exception {
+        AddWalkInClientDTO walkInDTO = new AddWalkInClientDTO("session-789", "Corte de Cabelo", "Senhor Carlos", "member-123");
+
+        QueueEntryResponseDTO walkInResponse = new QueueEntryResponseDTO(
+                "entry-999",
+                2,
+                null,
+                "Senhor Carlos",
+                "Corte de Cabelo",
+                QueueEntryStatus.WAITING,
+                null,
+                null,
+                null,
+                Instant.now(),
+                null,
+                10
+        );
+
+        when(queueEntryService.addWalkInClient(any(), any(), any())).thenReturn(walkInResponse);
+
+        mockMvc.perform(post("/queue-entries/walk-in")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonTester.write(walkInDTO).getJson()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value("entry-999"))
+                .andExpect(jsonPath("$.clientName").value("Senhor Carlos"))
+                .andExpect(jsonPath("$.userId").isEmpty()); // Verifica se o userId é nulo
+    }
+
     // ==================== PATCH REQUEUE ENTRY TESTS ====================
 
     @Test

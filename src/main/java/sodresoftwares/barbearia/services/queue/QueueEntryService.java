@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import sodresoftwares.barbearia.dto.queue.AddWalkInClientDTO;
 import sodresoftwares.barbearia.dto.queue.JoinQueueDTO;
 import sodresoftwares.barbearia.dto.queue.QueueEntryResponseDTO;
 import sodresoftwares.barbearia.dto.queue.UserQueueStatusDTO;
@@ -191,6 +192,32 @@ public class QueueEntryService {
     }
 
     @Transactional
+    public QueueEntryResponseDTO addWalkInClient(AddWalkInClientDTO dto, String loggedUserId, String actionMemberId) {
+        QueueSession session = getAndValidateSession(dto.queueSessionId());
+
+        getValidActionMember(session, loggedUserId, actionMemberId);
+
+        QueueEntry entry = QueueEntry.builder()
+                .queueSession(session)
+                .user(null)
+                .walkInName(dto.clientName())
+                .serviceName(dto.serviceName())
+                .status(QueueEntryStatus.WAITING)
+                .build();
+
+        QueueEntry savedEntry = queueEntryRepository.save(entry);
+        log.info("Walk-in client added to queue successfully by member: {}", actionMemberId);
+
+        queueCacheService.evictSessionList(dto.queueSessionId());
+
+        List<QueueEntry> activeEntries = queueEntryRepository.findActiveEntriesBySessionId(dto.queueSessionId());
+
+        queueNotificationService.notifyQueueUpdate(dto.queueSessionId());
+
+        return queueMapper.toSingleDto(savedEntry, activeEntries);
+    }
+
+    @Transactional
     public QueueEntryResponseDTO startService(String sessionId, String entryId, String loggedUserId) {
 
         List<QueueEntry> activeEntries = queueEntryRepository.findActiveEntriesBySessionId(sessionId);
@@ -242,7 +269,7 @@ public class QueueEntryService {
         boolean isTheClient = entry.getUser() != null && entry.getUser().getId().equals(loggedUserId);
 
         if (!isTheClient) {
-            validatePermissionToManageEntry(entry, loggedUserId);
+            validatePermissionToCancel(entry, loggedUserId);
         }
 
         validateStatusForCancellation(entry, loggedUserId);
@@ -421,7 +448,7 @@ public class QueueEntryService {
                     "This entry is already cancelled or finished.");
         }
 
-        boolean isTheClient = entry.getUser().getId().equals(loggedUserId);
+        boolean isTheClient = entry.getUser() != null && entry.getUser().getId().equals(loggedUserId);
         if (isTheClient && entry.getStatus() == QueueEntryStatus.IN_SERVICE) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
@@ -437,6 +464,30 @@ public class QueueEntryService {
                     HttpStatus.BAD_REQUEST,
                     "INVALID_STATUS",
                     "Only clients with CALLED status can be returned to the queue.");
+        }
+    }
+
+    private void validatePermissionToCancel(QueueEntry entry, String loggedUserId) {
+        String businessId = entry.getQueueSession().getBusiness().getId();
+
+        TeamMember loggedMember = teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue(loggedUserId, businessId)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.FORBIDDEN,
+                        "FORBIDDEN",
+                        "You do not belong to the team of this business."));
+
+        boolean isOwner = loggedMember.getRole() == TeamRole.OWNER;
+
+        boolean isTheMemberWhoCalled = entry.getServedByMember() != null &&
+                entry.getServedByMember().getId().equals(loggedMember.getId());
+
+        if (!isOwner && !isTheMemberWhoCalled) {
+            log.warn("Security alert: User {} attempted to cancel an entry without permission", loggedUserId);
+            throw new AppException(
+                    HttpStatus.FORBIDDEN,
+                    "FORBIDDEN",
+                    "Only the business owner or the professional attending the client can cancel this entry."
+            );
         }
     }
 }

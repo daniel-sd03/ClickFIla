@@ -55,11 +55,22 @@ public class QueueMapper {
             servedByMemberName = entry.getServedByMember().getName();
         }
 
+        String clientId;
+        String clientName;
+
+        if (entry.getUser() != null) {
+            clientId = entry.getUser().getId();
+            clientName = entry.getUser().getName();
+        } else {
+            clientId = null;
+            clientName = entry.getWalkInName();
+        }
+
         return new QueueEntryResponseDTO(
                 entry.getId(),
                 position,
-                entry.getUser().getId(),
-                entry.getUser().getName(),
+                clientId,
+                clientName,
                 entry.getServiceName(),
                 entry.getStatus(),
                 servedByMemberId,
