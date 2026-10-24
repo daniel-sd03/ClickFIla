@@ -93,23 +93,23 @@ class SubscriptionServiceTest {
 
     // ==================== CREATE TRIAL TESTS ====================
 
-//    @Test
-//    @DisplayName("Should create a TRIAL subscription successfully")
-//    void testCreateTrialSubscription_Success() {
-//        // Act
-//        subscriptionService.createTrialSubscription(testBusiness);
-//
-//        // Assert
-//        LocalDate expectedEndDate = LocalDate.now().plusDays(7);
-//
-//        verify(subscriptionRepository).save(argThat(subscription ->
-//                subscription.getBusiness().getId().equals(BUSINESS_ID) &&
-//                        subscription.getStatus() == SubscriptionStatus.TRIAL &&
-//                        subscription.getPaymentProvider() == PaymentProvider.ASAAS &&
-//                        subscription.getCurrentPeriodEnd().equals(expectedEndDate) &&
-//                        Boolean.FALSE.equals(subscription.getCancelAtPeriodEnd())
-//        ));
-//    }
+    @Test
+    @DisplayName("Should create a TRIAL subscription successfully")
+    void testCreateTrialSubscription_Success() {
+        // Act
+        subscriptionService.createTrialSubscription(testBusiness);
+
+        // Assert
+        LocalDate expectedEndDate = LocalDate.now().plusDays(7);
+
+        verify(subscriptionRepository).save(argThat(subscription ->
+                subscription.getBusiness().getId().equals(BUSINESS_ID) &&
+                        subscription.getStatus() == SubscriptionStatus.TRIAL &&
+                        subscription.getPaymentProvider() == PaymentProvider.ASAAS &&
+                        subscription.getCurrentPeriodEnd().equals(expectedEndDate) &&
+                        Boolean.FALSE.equals(subscription.getCancelAtPeriodEnd())
+        ));
+    }
 
     // ==================== GENERATE CHECKOUT TESTS ====================
 
