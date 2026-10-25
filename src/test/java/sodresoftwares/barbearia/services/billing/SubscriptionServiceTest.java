@@ -21,6 +21,7 @@ import sodresoftwares.barbearia.repositories.billing.PlanRepository;
 import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -100,7 +101,7 @@ class SubscriptionServiceTest {
         subscriptionService.createTrialSubscription(testBusiness);
 
         // Assert
-        LocalDate expectedEndDate = LocalDate.now().plusDays(7);
+        LocalDate expectedEndDate = LocalDate.now(ZoneId.of("America/Sao_Paulo")).plusDays(7);
 
         verify(subscriptionRepository).save(argThat(subscription ->
                 subscription.getBusiness().getId().equals(BUSINESS_ID) &&

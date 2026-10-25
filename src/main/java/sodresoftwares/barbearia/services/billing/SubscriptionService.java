@@ -16,6 +16,7 @@ import sodresoftwares.barbearia.repositories.billing.PlanRepository;
 import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 @Slf4j
 @Service
@@ -33,9 +34,8 @@ public class SubscriptionService {
 
     @Transactional
     public void createTrialSubscription(Business business) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneId.of("America/Sao_Paulo"));
         LocalDate trialEnd = today.plusDays(trialDays);
-        // --------------------- REATIVAR TESTE ------------------------//
 
         Subscription subscription = Subscription.builder()
                 .business(business)
