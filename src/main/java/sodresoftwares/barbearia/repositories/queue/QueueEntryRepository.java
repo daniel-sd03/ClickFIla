@@ -15,7 +15,7 @@ public interface QueueEntryRepository extends JpaRepository<QueueEntry, String> 
 
     @Query("""
         SELECT q FROM QueueEntry q
-        JOIN FETCH q.user
+        LEFT JOIN FETCH q.user
         JOIN FETCH q.queueSession
         LEFT JOIN FETCH q.servedByMember sbm
         LEFT JOIN FETCH sbm.user
@@ -33,7 +33,7 @@ public interface QueueEntryRepository extends JpaRepository<QueueEntry, String> 
     Optional<QueueEntry> findByIdWithUser(@Param("id") String id);
 
     @Query("SELECT e FROM QueueEntry e " +
-            "JOIN FETCH e.user u " +
+            "LEFT JOIN FETCH e.user u " +
             "JOIN FETCH e.queueSession s " +
             "JOIN FETCH s.business b " +
             "JOIN FETCH b.user " +
