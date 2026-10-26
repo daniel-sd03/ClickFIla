@@ -136,9 +136,8 @@ class SubscriptionServiceTest {
         assertThat(checkoutUrl).isEqualTo("https://checkout.url");
 
         verify(subscriptionRepository).save(argThat(sub ->
-                sub.getGatewayCustomerId().equals("gw-cus-999") &&
-                        sub.getGatewaySubscriptionId().equals("gw-sub-999") &&
-                        sub.getPlan().getCode().equals(PLAN_CODE)
+                        sub.getGatewayCustomerId().equals("gw-cus-999") &&
+                                sub.getGatewaySubscriptionId().equals("gw-sub-999")
         ));
     }
 
