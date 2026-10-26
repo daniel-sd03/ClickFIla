@@ -75,6 +75,9 @@ public class Payment {
     @Column(name = "receipt_url", columnDefinition = "TEXT")
     private String receiptUrl;
 
+    @Column(name = "last_gateway_event", length = 100)
+    private String lastGatewayEvent;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

@@ -195,6 +195,7 @@ CREATE TABLE payments
     pix_copy_paste     TEXT,
     pix_qr_code_base64 TEXT,
     receipt_url        TEXT,
+    last_gateway_event VARCHAR(100),
     created_at         TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at         TIMESTAMPTZ,
     created_by         VARCHAR(255),
@@ -212,6 +213,19 @@ CREATE TABLE subscription_history
     created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_history_subscription FOREIGN KEY (subscription_id) REFERENCES subscriptions (id) ON DELETE CASCADE
 );
+
+CREATE TABLE payment_history
+(
+    id              VARCHAR(36) PRIMARY KEY,
+    payment_id      VARCHAR(36)  NOT NULL,
+    previous_status VARCHAR(50),
+    new_status      VARCHAR(50)  NOT NULL,
+    gateway_event   VARCHAR(100) NOT NULL,
+    created_at      TIMESTAMP    NOT NULL,
+    CONSTRAINT fk_payment_history_payment FOREIGN KEY (payment_id) REFERENCES payment (id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_payment_history_payment_id ON payment_history (payment_id);
 
 CREATE INDEX idx_subscription_history_sub_id
     ON subscription_history (subscription_id);
