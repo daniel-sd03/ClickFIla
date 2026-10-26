@@ -222,7 +222,7 @@ CREATE TABLE payment_history
     new_status      VARCHAR(50)  NOT NULL,
     gateway_event   VARCHAR(100) NOT NULL,
     created_at      TIMESTAMP    NOT NULL,
-    CONSTRAINT fk_payment_history_payment FOREIGN KEY (payment_id) REFERENCES payment (id) ON DELETE CASCADE
+    CONSTRAINT fk_payment_history_payment FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_payment_history_payment_id ON payment_history (payment_id);
