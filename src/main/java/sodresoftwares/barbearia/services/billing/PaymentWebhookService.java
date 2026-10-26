@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import sodresoftwares.barbearia.infra.exception.AppException;
 import sodresoftwares.barbearia.model.billing.*;
 import sodresoftwares.barbearia.repositories.billing.PaymentRepository;
+import sodresoftwares.barbearia.repositories.billing.PlanRepository;
 import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;
 
 import java.math.BigDecimal;
@@ -24,6 +25,7 @@ public class PaymentWebhookService {
 
     private final SubscriptionRepository subscriptionRepository;
     private final PaymentRepository paymentRepository;
+    private final PlanRepository planRepository;
     private final PaymentHistoryService paymentHistoryService;
     private final SubscriptionHistoryService subscriptionHistoryService;
 
@@ -124,7 +126,8 @@ public class PaymentWebhookService {
             payment.setLastGatewayEvent(event);
             paymentRepository.save(payment);
 
-            extendSubscription(payment, event);
+            String planCode = (String) paymentData.get("description");
+            extendSubscription(payment, event, planCode);
         });
     }
 
@@ -174,13 +177,34 @@ public class PaymentWebhookService {
 
     //------------ Auxiliary Methods ------------
 
-    private void extendSubscription(Payment payment, String event) {
+    private void extendSubscription(Payment payment, String event, String planCode) {
         Subscription lockedSub = subscriptionRepository.findByIdWithLock(payment.getSubscription().getId())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "SUBSCRIPTION_NOT_FOUND", "Subscription not found."));
 
-        Plan plan = lockedSub.getPlan();
-        LocalDate newPeriodEnd;
+        if (planCode != null && !planCode.isBlank() &&
+                (lockedSub.getPlan() == null || !lockedSub.getPlan().getCode().equals(planCode))) {
 
+            Plan newPlan = planRepository.findByCode(planCode)
+                    .orElseThrow(() -> new AppException(
+                            HttpStatus.NOT_FOUND,
+                            "PLAN_NOT_FOUND",
+                            "Plan not found for code: " + planCode
+                    ));
+
+            lockedSub.setPlan(newPlan);
+            log.info("Subscription {} plan updated to {}", lockedSub.getId(), planCode);
+        }
+
+        Plan plan = lockedSub.getPlan();
+        if (plan == null) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_STATE",
+                    "Subscription has no plan assigned."
+            );
+        }
+
+        LocalDate newPeriodEnd;
         LocalDate baseDate = lockedSub.getCurrentPeriodEnd().isBefore(LocalDate.now())
                 ? LocalDate.now()
                 : lockedSub.getCurrentPeriodEnd();

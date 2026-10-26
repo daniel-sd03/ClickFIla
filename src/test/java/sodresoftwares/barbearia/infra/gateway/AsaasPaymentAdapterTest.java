@@ -62,6 +62,7 @@ class AsaasPaymentAdapterTest {
 
         testPlan = Plan.builder()
                 .name("PRO")
+                .code("PRO_MONTHLY")
                 .price(new BigDecimal("50.00"))
                 .billingCycle(BillingCycle.MONTHLY)
                 .build();
@@ -142,6 +143,8 @@ class AsaasPaymentAdapterTest {
                 .andExpect(jsonPath("$.chargeType").value("RECURRENT"))
                 .andExpect(jsonPath("$.customer").value("cus_123"))
                 .andExpect(jsonPath("$.dueDateLimitDays").value(5))
+                .andExpect(jsonPath("$.description").value(testPlan.getCode()))
+                .andExpect(jsonPath("$.externalReference").value(testBusiness.getId()))
                 .andRespond(withSuccess(expectedJsonResponse, MediaType.APPLICATION_JSON));
 
         // Act
@@ -165,6 +168,8 @@ class AsaasPaymentAdapterTest {
                 .andExpect(jsonPath("$.chargeType").value("DETACHED"))
                 .andExpect(jsonPath("$.maxInstallmentCount").value(12))
                 .andExpect(jsonPath("$.dueDateLimitDays").value(5))
+                .andExpect(jsonPath("$.description").value(testPlan.getCode()))
+                .andExpect(jsonPath("$.externalReference").value(testBusiness.getId()))
                 .andRespond(withSuccess(expectedJsonResponse, MediaType.APPLICATION_JSON));
 
         // Act

@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.billing.*;
 import sodresoftwares.barbearia.repositories.billing.PaymentRepository;
+import sodresoftwares.barbearia.repositories.billing.PlanRepository;
 import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;
 
 import java.math.BigDecimal;
@@ -38,6 +39,9 @@ class PaymentWebhookServiceTest {
     @Mock
     private PaymentHistoryService paymentHistoryService;
 
+    @Mock
+    private PlanRepository planRepository;
+
     @InjectMocks
     private PaymentWebhookService webhookService;
 
@@ -57,6 +61,7 @@ class PaymentWebhookServiceTest {
                 .build();
 
         mockMonthlyPlan = Plan.builder()
+                .code("BASIC_MONTHLY")
                 .billingCycle(BillingCycle.MONTHLY)
                 .price(new BigDecimal("50.00"))
                 .build();
@@ -236,6 +241,40 @@ class PaymentWebhookServiceTest {
         verify(paymentRepository).save(mockPayment);
         verify(subscriptionRepository).save(mockSubscription);
         verify(subscriptionHistoryService).logStatusChange(mockSubscription, SubscriptionStatus.SUSPENDED, "WEBHOOK: PAYMENT_REFUNDED");
+    }
+
+    @Test
+    @DisplayName("Should update subscription plan when description (planCode) is provided and different")
+    void testProcessWebhook_PaymentConfirmed_WithPlanUpdate() {
+        // Arrange
+        Plan newProPlan = Plan.builder()
+                .code("PRO_MONTHLY")
+                .billingCycle(BillingCycle.MONTHLY)
+                .price(new BigDecimal("150.00"))
+                .build();
+
+        when(paymentRepository.findByGatewayInvoiceId(INVOICE_ID)).thenReturn(Optional.of(mockPayment));
+        when(subscriptionRepository.findByIdWithLock(SUBSCRIPTION_ID)).thenReturn(Optional.of(mockSubscription));
+
+        when(planRepository.findByCode("PRO_MONTHLY")).thenReturn(Optional.of(newProPlan));
+
+        Map<String, Object> payload = Map.of(
+                "event", "PAYMENT_CONFIRMED",
+                "payment", Map.of(
+                        "id", INVOICE_ID,
+                        "description", "PRO_MONTHLY"
+                )
+        );
+
+        // Act
+        webhookService.processWebhook(payload);
+
+        // Assert
+        assertThat(mockSubscription.getPlan()).isEqualTo(newProPlan);
+        assertThat(mockSubscription.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+
+        verify(planRepository).findByCode("PRO_MONTHLY");
+        verify(subscriptionRepository).save(mockSubscription);
     }
 
     // ==================== SUBSCRIPTION ROUTER TESTS ====================

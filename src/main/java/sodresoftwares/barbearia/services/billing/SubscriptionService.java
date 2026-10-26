@@ -65,9 +65,12 @@ public class SubscriptionService {
         String customerId = paymentGatewayPort.createOrUpdateCustomer(subscription.getBusiness());
         subscription.setGatewayCustomerId(customerId);
 
-        var checkoutResponse = paymentGatewayPort.createSubscriptionCheckout(subscription.getBusiness(), plan, customerId);
+        var checkoutResponse = paymentGatewayPort.createSubscriptionCheckout(
+                subscription.getBusiness(),
+                plan,
+                customerId
+        );
 
-        subscription.setPlan(plan);
         subscription.setGatewaySubscriptionId(checkoutResponse.gatewaySubscriptionId());
         subscriptionRepository.save(subscription);
 
