@@ -222,8 +222,24 @@ CREATE TABLE payment_history
     new_status      VARCHAR(50)  NOT NULL,
     gateway_event   VARCHAR(100) NOT NULL,
     created_at      TIMESTAMP    NOT NULL,
+
     CONSTRAINT fk_payment_history_payment FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE CASCADE
 );
+
+CREATE TABLE business_payment_methods
+(
+    id                  TEXT PRIMARY KEY UNIQUE NOT NULL,
+    business_id         TEXT                    NOT NULL,
+    card_brand          VARCHAR(30),
+    last_four_digits    VARCHAR(4)              NOT NULL,
+    credit_card_token   TEXT                    NOT NULL,
+    is_default          BOOLEAN DEFAULT TRUE    NOT NULL,
+    created_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMPTZ,
+    CONSTRAINT fk_payment_method_business FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_payment_methods_business_id ON business_payment_methods (business_id);
 
 CREATE INDEX idx_payment_history_payment_id ON payment_history (payment_id);
 

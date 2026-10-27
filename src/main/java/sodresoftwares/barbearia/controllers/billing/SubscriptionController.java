@@ -21,10 +21,11 @@ public class SubscriptionController {
     private final SubscriptionService subscriptionService;
 
     @PostMapping("/checkout")
-    public ResponseEntity<Map<String, String>> generateCheckout(
+    public ResponseEntity<Void> processCheckout(
+            @AuthenticationPrincipal User loggedInUser,
             @Valid @RequestBody CheckoutRequest request) {
-        String checkoutUrl = subscriptionService.generateCheckout(request.businessId(), request.planCode());
-        return ResponseEntity.ok(Map.of("checkoutUrl", checkoutUrl));
+        subscriptionService.processTransparentCheckout(loggedInUser.getId(), request);
+        return ResponseEntity.ok().build();
     }
 
 
