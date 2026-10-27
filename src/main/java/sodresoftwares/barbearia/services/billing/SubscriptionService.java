@@ -6,11 +6,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import sodresoftwares.barbearia.dto.billing.CheckoutRequest;
 import sodresoftwares.barbearia.dto.billing.SubscriptionResponseDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
 import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.billing.*;
 import sodresoftwares.barbearia.ports.PaymentGatewayPort;
+import sodresoftwares.barbearia.repositories.billing.BusinessPaymentMethodRepository;
 import sodresoftwares.barbearia.repositories.billing.PaymentRepository;
 import sodresoftwares.barbearia.repositories.billing.PlanRepository;
 import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;
@@ -28,6 +30,7 @@ public class SubscriptionService {
     private final PlanRepository planRepository;
     private final PaymentGatewayPort paymentGatewayPort;
     private final PaymentRepository paymentRepository;
+    private final BusinessPaymentMethodRepository paymentMethodRepository; // Novo repositório injetado
 
     @Value("${billing.trial.days}")
     private int trialDays;
@@ -52,30 +55,50 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public String generateCheckout(String businessId, String planCode) {
-        Subscription subscription = getSubscriptionByBusiness(businessId);
+    public void processTransparentCheckout(String userId, CheckoutRequest request) {
+        // 1. Busca a assinatura do usuário logado
+        Subscription subscription = subscriptionRepository.findByUserIdWithBusinessAndPlan(userId)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.NOT_FOUND,
+                        "SUBSCRIPTION_NOT_FOUND",
+                        "No subscription found for this user."
+                ));
 
-        Plan plan = planRepository.findByCode(planCode)
+        Business business = subscription.getBusiness();
+
+        Plan plan = planRepository.findByCode(request.planId())
                 .orElseThrow(() -> new AppException(
                         HttpStatus.NOT_FOUND,
                         "PLAN_NOT_FOUND",
                         "The selected plan is not available."
                 ));
 
-        String customerId = paymentGatewayPort.createOrUpdateCustomer(subscription.getBusiness());
+        String customerId = paymentGatewayPort.createOrUpdateCustomer(business);
         subscription.setGatewayCustomerId(customerId);
 
-        var checkoutResponse = paymentGatewayPort.createSubscriptionCheckout(
-                subscription.getBusiness(),
+        var checkoutResponse = paymentGatewayPort.processCreditCardCheckout(
+                business,
                 plan,
-                customerId
+                customerId,
+                request.creditCard(),
+                request.creditCardHolderInfo()
         );
 
+        BusinessPaymentMethod paymentMethod = BusinessPaymentMethod.builder()
+                .business(business)
+                .cardBrand(checkoutResponse.cardBrand())
+                .lastFourDigits(checkoutResponse.lastFourDigits())
+                .creditCardToken(checkoutResponse.creditCardToken())
+                .isDefault(true)
+                .build();
+
+        paymentMethodRepository.save(paymentMethod);
+
         subscription.setGatewaySubscriptionId(checkoutResponse.gatewaySubscriptionId());
+        subscription.setPlan(plan);
         subscriptionRepository.save(subscription);
 
-        log.info("Checkout generated for business {}. URL: {}", businessId, checkoutResponse.checkoutUrl());
-        return checkoutResponse.checkoutUrl();
+        log.info("Transparent checkout processed successfully for business {}.", business.getId());
     }
 
     @Transactional
