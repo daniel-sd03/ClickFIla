@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import sodresoftwares.barbearia.dto.billing.CheckoutRequest;
+import sodresoftwares.barbearia.dto.billing.CreditCardSummaryDTO;
+import sodresoftwares.barbearia.dto.billing.PlanResponseDTO;
 import sodresoftwares.barbearia.dto.billing.SubscriptionResponseDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
 import sodresoftwares.barbearia.model.business.Business;
@@ -172,23 +174,22 @@ public class SubscriptionService {
                         "Subscription not found for this user."
                 ));
 
-        String paymentLink = null;
-        if (subscription.getStatus() == SubscriptionStatus.SUSPENDED) {
-            paymentLink = paymentRepository.findLatestPendingOrOverduePayment(subscription.getId())
-                    .map(Payment::getInvoiceUrl)
-                    .orElse(null);
-        }
+        PlanResponseDTO planDto = subscription.getPlan() != null
+                ? PlanResponseDTO.fromEntity(subscription.getPlan())
+                : null;
 
-        String planName = subscription.getPlan() != null ? subscription.getPlan().getName() : "Trial";
+        CreditCardSummaryDTO cardDto = paymentMethodRepository.findByBusinessId(subscription.getBusiness().getId())
+                .map(method -> new CreditCardSummaryDTO(method.getCardBrand(), method.getLastFourDigits()))
+                .orElse(null);
 
         return new SubscriptionResponseDTO(
                 subscription.getStatus(),
-                planName,
+                planDto,
                 subscription.getCurrentPeriodEnd(),
-                paymentLink
+                subscription.getCancelAtPeriodEnd(),
+                cardDto
         );
     }
-
     private Subscription getSubscriptionByBusiness(String businessId) {
         return subscriptionRepository.findByBusinessIdWithBusiness(businessId)
                 .orElseThrow(() -> new AppException(
