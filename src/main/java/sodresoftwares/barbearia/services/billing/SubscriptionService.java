@@ -99,6 +99,8 @@ public class SubscriptionService {
 
         subscription.setGatewaySubscriptionId(checkoutResponse.gatewaySubscriptionId());
         subscription.setPlan(plan);
+        subscription.setStatus(SubscriptionStatus.ACTIVE);
+        subscription.setCancelAtPeriodEnd(false);
         subscriptionRepository.save(subscription);
 
         log.info("Transparent checkout processed successfully for business {}.", business.getId());

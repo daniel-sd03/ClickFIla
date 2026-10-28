@@ -13,6 +13,7 @@ import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.team.TeamMember;
 import sodresoftwares.barbearia.model.team.TeamRole;
 import sodresoftwares.barbearia.model.user.User;
+import sodresoftwares.barbearia.model.billing.SubscriptionStatus;
 import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;
 import sodresoftwares.barbearia.repositories.business.BusinessRepository;
 import sodresoftwares.barbearia.repositories.queue.QueueEntryRepository;
@@ -156,6 +157,17 @@ public class BusinessService {
         businessRepository.save(business);
 
         teamMemberRepository.deactivateAllByBusinessId(business.getId());
+
+        subscriptionRepository.findByBusinessIdWithBusiness(business.getId())
+                .ifPresent(subscription -> {
+                    if (subscription.getStatus() != SubscriptionStatus.CANCELED
+                            && !Boolean.TRUE.equals(subscription.getCancelAtPeriodEnd())) {
+
+                        subscriptionService.cancelSubscription(business.getId());
+                        log.info("Active subscription for business {} was automatically marked for cancellation.", business.getId());
+                    }
+                });
+
         log.info("Business {} and all its active team members were deactivated.", business.getId());
     }
 
