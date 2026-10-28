@@ -28,6 +28,13 @@ public class SubscriptionController {
         return ResponseEntity.ok().build();
     }
 
+    @PutMapping("/credit-card")
+    public ResponseEntity<Void> updateCreditCard(
+            @AuthenticationPrincipal User loggedInUser,
+            @RequestBody @Valid CheckoutRequest request) {
+        subscriptionService.updateCreditCard(loggedInUser.getId(), request);
+        return ResponseEntity.ok().build();
+    }
 
     @PostMapping("/cancel/{businessId}")
     public ResponseEntity<Void> cancelSubscription(

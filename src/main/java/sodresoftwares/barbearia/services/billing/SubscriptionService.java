@@ -30,7 +30,7 @@ public class SubscriptionService {
     private final PlanRepository planRepository;
     private final PaymentGatewayPort paymentGatewayPort;
     private final PaymentRepository paymentRepository;
-    private final BusinessPaymentMethodRepository paymentMethodRepository; // Novo repositório injetado
+    private final BusinessPaymentMethodRepository paymentMethodRepository;
 
     @Value("${billing.trial.days}")
     private int trialDays;
@@ -56,7 +56,6 @@ public class SubscriptionService {
 
     @Transactional
     public void processTransparentCheckout(String userId, CheckoutRequest request) {
-        // 1. Busca a assinatura do usuário logado
         Subscription subscription = subscriptionRepository.findByUserIdWithBusinessAndPlan(userId)
                 .orElseThrow(() -> new AppException(
                         HttpStatus.NOT_FOUND,
@@ -84,13 +83,15 @@ public class SubscriptionService {
                 request.creditCardHolderInfo()
         );
 
-        BusinessPaymentMethod paymentMethod = BusinessPaymentMethod.builder()
-                .business(business)
-                .cardBrand(checkoutResponse.cardBrand())
-                .lastFourDigits(checkoutResponse.lastFourDigits())
-                .creditCardToken(checkoutResponse.creditCardToken())
-                .isDefault(true)
-                .build();
+        BusinessPaymentMethod paymentMethod = paymentMethodRepository.findByBusinessId(business.getId())
+                .orElseGet(() -> BusinessPaymentMethod.builder()
+                        .business(business)
+                        .isDefault(true)
+                        .build());
+
+        paymentMethod.setCardBrand(checkoutResponse.cardBrand());
+        paymentMethod.setLastFourDigits(checkoutResponse.lastFourDigits());
+        paymentMethod.setCreditCardToken(checkoutResponse.creditCardToken());
 
         paymentMethodRepository.save(paymentMethod);
 
@@ -99,6 +100,46 @@ public class SubscriptionService {
         subscriptionRepository.save(subscription);
 
         log.info("Transparent checkout processed successfully for business {}.", business.getId());
+    }
+
+    @Transactional
+    public void updateCreditCard(String userId, CheckoutRequest request) {
+        Subscription subscription = subscriptionRepository.findByUserIdWithBusinessAndPlan(userId)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.NOT_FOUND,
+                        "SUBSCRIPTION_NOT_FOUND",
+                        "No subscription found for this user."
+                ));
+
+        if (subscription.getGatewaySubscriptionId() == null) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_SUBSCRIPTION",
+                    "This subscription does not have an active gateway link to update."
+            );
+        }
+
+        var gatewayResponse = paymentGatewayPort.updateSubscriptionCreditCard(
+                subscription.getGatewaySubscriptionId(),
+                request.creditCard(),
+                request.creditCardHolderInfo()
+        );
+
+        Business business = subscription.getBusiness();
+
+        BusinessPaymentMethod paymentMethod = paymentMethodRepository.findByBusinessId(business.getId())
+                .orElseGet(() -> BusinessPaymentMethod.builder()
+                        .business(business)
+                        .isDefault(true)
+                        .build());
+
+        paymentMethod.setCardBrand(gatewayResponse.cardBrand());
+        paymentMethod.setLastFourDigits(gatewayResponse.lastFourDigits());
+        paymentMethod.setCreditCardToken(gatewayResponse.creditCardToken());
+
+        paymentMethodRepository.save(paymentMethod);
+
+        log.info("Credit card updated successfully for business {}.", business.getId());
     }
 
     @Transactional

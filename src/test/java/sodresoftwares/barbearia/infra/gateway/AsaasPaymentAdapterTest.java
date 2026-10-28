@@ -162,8 +162,41 @@ class AsaasPaymentAdapterTest {
 
         assertThatThrownBy(() -> adapter.processCreditCardCheckout(testBusiness, testPlan, "cus_123", testCreditCard, testHolder))
                 .isInstanceOf(AppException.class)
-                .hasMessage("O cartão foi recusado ou os dados são inválidos. Verifique as informações e tente novamente.")
+                .hasMessage("The card was declined or the provided data is invalid. Please check the information and try again.")
                 .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    // ==================== UPDATE SUBSCRIPTION TESTS ====================
+
+    @Test
+    @DisplayName("Should update credit card and return tokenized data successfully")
+    void shouldUpdateCreditCardSuccessfully() {
+        String expectedJsonResponse = """
+                {
+                    "id": "sub_123",
+                    "creditCard": {
+                        "creditCardNumber": "4444",
+                        "creditCardBrand": "MASTERCARD",
+                        "creditCardToken": "tok_new123"
+                    }
+                }
+                """;
+
+        String gatewaySubscriptionId = "sub_123";
+
+        mockServer.expect(requestTo(API_URL + "/subscriptions/" + gatewaySubscriptionId))
+                .andExpect(method(HttpMethod.PUT))
+                .andExpect(jsonPath("$.billingType").value("CREDIT_CARD"))
+                .andExpect(jsonPath("$.creditCard.holderName").value("DANIEL S S PAULA"))
+                .andRespond(withSuccess(expectedJsonResponse, MediaType.APPLICATION_JSON));
+
+        GatewayCreditCardResponse response = adapter.updateSubscriptionCreditCard(gatewaySubscriptionId, testCreditCard, testHolder);
+
+        assertThat(response).isNotNull();
+        assertThat(response.gatewaySubscriptionId()).isEqualTo("sub_123");
+        assertThat(response.creditCardToken()).isEqualTo("tok_new123");
+        assertThat(response.cardBrand()).isEqualTo("MASTERCARD");
+        assertThat(response.lastFourDigits()).isEqualTo("4444");
     }
 
     // ==================== CANCEL SUBSCRIPTION TESTS ====================

@@ -26,6 +26,15 @@ public interface PaymentGatewayPort {
     );
 
     /**
+     * Updates the credit card on an active subscription in the Gateway.
+     */
+    GatewayCreditCardResponse updateSubscriptionCreditCard(
+            String gatewaySubscriptionId,
+            CreditCardDTO creditCard,
+            CreditCardHolderDTO holderInfo
+    );
+
+    /**
      * Cancels the active subscription in the Gateway.
      */
     void cancelSubscription(String gatewaySubscriptionId);
@@ -36,5 +45,6 @@ public interface PaymentGatewayPort {
             String creditCardToken,
             String cardBrand,
             String lastFourDigits
-    ) {}
+    ) {
+    }
 }

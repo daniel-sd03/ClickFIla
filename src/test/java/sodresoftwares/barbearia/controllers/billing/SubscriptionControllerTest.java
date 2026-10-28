@@ -34,11 +34,11 @@ import sodresoftwares.barbearia.services.billing.SubscriptionService;
 
 import java.time.LocalDate;
 
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -97,8 +97,10 @@ class SubscriptionControllerTest {
         SecurityContextHolder.clearContext();
     }
 
+    // ==================== POST CHECKOUT TESTS ====================
+
     @Test
-    @DisplayName("Should process transparent checkout successfully")
+    @DisplayName("POST /subscriptions/checkout -> Should process transparent checkout successfully")
     void shouldProcessTransparentCheckout() throws Exception {
         CreditCardDTO creditCard = new CreditCardDTO(
                 "João F FERNANDES", "4111111111111111", "12", "2028", "123"
@@ -116,15 +118,34 @@ class SubscriptionControllerTest {
                 .andExpect(status().isOk());
     }
 
+    // ==================== PUT UPDATE CREDIT CARD TESTS ====================
+
     @Test
-    @DisplayName("Should cancel subscription successfully")
+    @DisplayName("PUT /subscriptions/credit-card -> Should update credit card successfully")
+    void shouldUpdateCreditCard() throws Exception {
+        CreditCardDTO creditCard = new CreditCardDTO("João F", "4111111111111111", "12", "2028", "123");
+        CreditCardHolderDTO holderInfo = new CreditCardHolderDTO("João F", "test@test.com", "12345678909", "30123456", "100", null, "31999999999", null);
+        CheckoutRequest request = new CheckoutRequest("PRO_MONTHLY", creditCard, holderInfo);
+
+        mockMvc.perform(put("/subscriptions/credit-card")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonTester.write(request).getJson()))
+                .andExpect(status().isOk());
+    }
+
+    // ==================== POST CANCEL SUBSCRIPTION TESTS ====================
+
+    @Test
+    @DisplayName("POST /subscriptions/cancel/{businessId} -> Should cancel subscription successfully")
     void shouldCancelSubscription() throws Exception {
         mockMvc.perform(post("/subscriptions/cancel/biz-123"))
                 .andExpect(status().isNoContent());
     }
 
+    // ==================== GET MY SUBSCRIPTION TESTS ====================
+
     @Test
-    @DisplayName("Should get logged user subscription details")
+    @DisplayName("GET /subscriptions/me -> Should get logged user subscription details")
     void shouldGetMySubscription() throws Exception {
         SubscriptionResponseDTO responseDTO = new SubscriptionResponseDTO(
                 SubscriptionStatus.ACTIVE,

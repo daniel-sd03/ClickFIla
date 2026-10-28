@@ -2,6 +2,7 @@ package sodresoftwares.barbearia.infra.gateway;
 
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -36,11 +37,7 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
     @Override
     public String createOrUpdateCustomer(@NonNull Business business) {
         if (business.getCpfCnpj() == null || business.getCpfCnpj().trim().isEmpty()) {
-            throw new AppException(
-                    HttpStatus.BAD_REQUEST,
-                    "MISSING_DOCUMENT",
-                    "CPF or CNPJ is required to process the payment."
-            );
+            throw new AppException(HttpStatus.BAD_REQUEST, "MISSING_DOCUMENT", "CPF or CNPJ is required to process the payment.");
         }
 
         var requestBody = Map.of(
@@ -57,18 +54,13 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
                 .body(Map.class);
 
         if (response == null || !response.containsKey("id")) {
-            throw new AppException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    "GATEWAY_ERROR",
-                    "Failed to communicate with the payment gateway."
-            );
+            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "GATEWAY_ERROR", "Failed to communicate with the payment gateway.");
         }
 
         return (String) response.get("id");
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public GatewayCreditCardResponse processCreditCardCheckout(
             Business business,
             @NonNull Plan plan,
@@ -86,24 +78,6 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
             );
         };
 
-        var creditCardPayload = Map.of(
-                "holderName", creditCard.holderName(),
-                "number", creditCard.number().replaceAll("\\D", ""),
-                "expiryMonth", creditCard.expiryMonth(),
-                "expiryYear", creditCard.expiryYear(),
-                "ccv", creditCard.ccv()
-        );
-
-        var holderPayload = new HashMap<String, String>();
-        holderPayload.put("name", holderInfo.name());
-        holderPayload.put("email", holderInfo.email());
-        holderPayload.put("cpfCnpj", holderInfo.cpfCnpj().replaceAll("\\D", ""));
-        holderPayload.put("postalCode", holderInfo.postalCode().replaceAll("\\D", ""));
-        holderPayload.put("addressNumber", holderInfo.addressNumber());
-        holderPayload.put("phone", holderInfo.phone().replaceAll("\\D", ""));
-        if (holderInfo.addressComplement() != null) holderPayload.put("addressComplement", holderInfo.addressComplement());
-        if (holderInfo.mobilePhone() != null) holderPayload.put("mobilePhone", holderInfo.mobilePhone().replaceAll("\\D", ""));
-
         var requestBody = Map.of(
                 "customer", gatewayCustomerId,
                 "billingType", "CREDIT_CARD",
@@ -112,34 +86,39 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
                 "cycle", cycle,
                 "description", plan.getCode(),
                 "externalReference", business.getId(),
-                "creditCard", creditCardPayload,
-                "creditCardHolderInfo", holderPayload,
+                "creditCard", buildCreditCardPayload(creditCard),
+                "creditCardHolderInfo", buildHolderPayload(holderInfo),
                 "remoteIp", getClientIpAddress()
         );
 
-        var response = restClient.post()
-                .uri("/subscriptions")
-                .body(requestBody)
-                .retrieve()
-                .onStatus(status -> status.is4xxClientError(), (req, res) -> {
-                    throw new AppException(HttpStatus.BAD_REQUEST, "PAYMENT_REJECTED", "O cartão foi recusado ou os dados são inválidos. Verifique as informações e tente novamente.");
-                })
-                .body(Map.class);
+        return sendSubscriptionRequest(
+                HttpMethod.POST,
+                "/subscriptions",
+                null, requestBody,
+                "The card was declined or the provided data is invalid. Please check the information and try again."
+        );
+    }
 
-        if (response == null || !response.containsKey("id")) {
-            throw new AppException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    "GATEWAY_ERROR",
-                    "Failed to generate transparent checkout."
-            );
-        }
+    @Override
+    public GatewayCreditCardResponse updateSubscriptionCreditCard(
+            String gatewaySubscriptionId,
+            CreditCardDTO creditCard,
+            CreditCardHolderDTO holderInfo) {
 
-        Map<String, Object> asaasCreditCardData = (Map<String, Object>) response.get("creditCard");
-        String token = asaasCreditCardData != null ? (String) asaasCreditCardData.get("creditCardToken") : "NO_TOKEN";
-        String brand = asaasCreditCardData != null ? (String) asaasCreditCardData.get("creditCardBrand") : "UNKNOWN";
-        String lastFour = asaasCreditCardData != null ? (String) asaasCreditCardData.get("creditCardNumber") : "0000";
+        var requestBody = Map.of(
+                "billingType", "CREDIT_CARD",
+                "creditCard", buildCreditCardPayload(creditCard),
+                "creditCardHolderInfo", buildHolderPayload(holderInfo),
+                "remoteIp", getClientIpAddress()
+        );
 
-        return new GatewayCreditCardResponse((String) response.get("id"), token, brand, lastFour);
+        return sendSubscriptionRequest(
+                HttpMethod.PUT,
+                "/subscriptions/{id}",
+                gatewaySubscriptionId,
+                requestBody,
+                "The new card was declined or the provided data is invalid."
+        );
     }
 
     @Override
@@ -154,12 +133,73 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
     // Auxiliary Methods
     // ======================================================================================
 
+    /**
+     * Reusable method to send the request (POST/PUT) and parse the GatewayCreditCardResponse.
+     */
+    @SuppressWarnings("unchecked")
+    private GatewayCreditCardResponse sendSubscriptionRequest(
+            HttpMethod method,
+            String uri,
+            String uriVariable,
+            Map<String, Object> requestBody,
+            String errorMessage) {
+
+        var requestBuilder = method == HttpMethod.POST ? restClient.post() : restClient.put();
+
+        var uriBuilder = uriVariable != null ? requestBuilder.uri(uri, uriVariable) : requestBuilder.uri(uri);
+
+        var response = uriBuilder
+                .body(requestBody)
+                .retrieve()
+                .onStatus(status -> status.is4xxClientError(), (req, res) -> {
+                    throw new AppException(
+                            HttpStatus.BAD_REQUEST,
+                            "PAYMENT_REJECTED",
+                            errorMessage);
+                })
+                .body(Map.class);
+
+        if (response == null || !response.containsKey("id")) {
+            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "GATEWAY_ERROR", "Failed to process transparent checkout with the payment gateway.");
+        }
+
+        Map<String, Object> asaasCreditCardData = (Map<String, Object>) response.get("creditCard");
+        String token = asaasCreditCardData != null ? (String) asaasCreditCardData.get("creditCardToken") : "NO_TOKEN";
+        String brand = asaasCreditCardData != null ? (String) asaasCreditCardData.get("creditCardBrand") : "UNKNOWN";
+        String lastFour = asaasCreditCardData != null ? (String) asaasCreditCardData.get("creditCardNumber") : "0000";
+
+        return new GatewayCreditCardResponse((String) response.get("id"), token, brand, lastFour);
+    }
+
+    private Map<String, String> buildCreditCardPayload(CreditCardDTO creditCard) {
+        return Map.of(
+                "holderName", creditCard.holderName(),
+                "number", creditCard.number().replaceAll("\\D", ""),
+                "expiryMonth", creditCard.expiryMonth(),
+                "expiryYear", creditCard.expiryYear(),
+                "ccv", creditCard.ccv()
+        );
+    }
+
+    private Map<String, String> buildHolderPayload(CreditCardHolderDTO holderInfo) {
+        var holderPayload = new HashMap<String, String>();
+        holderPayload.put("name", holderInfo.name());
+        holderPayload.put("email", holderInfo.email());
+        holderPayload.put("cpfCnpj", holderInfo.cpfCnpj().replaceAll("\\D", ""));
+        holderPayload.put("postalCode", holderInfo.postalCode().replaceAll("\\D", ""));
+        holderPayload.put("addressNumber", holderInfo.addressNumber());
+        holderPayload.put("phone", holderInfo.phone().replaceAll("\\D", ""));
+        if (holderInfo.addressComplement() != null) holderPayload.put("addressComplement", holderInfo.addressComplement());
+        if (holderInfo.mobilePhone() != null) holderPayload.put("mobilePhone", holderInfo.mobilePhone().replaceAll("\\D", ""));
+        return holderPayload;
+    }
+
     private String getClientIpAddress() {
         var requestAttributes = RequestContextHolder.getRequestAttributes();
         if (requestAttributes instanceof ServletRequestAttributes servletRequestAttributes) {
             String xForwardedFor = servletRequestAttributes.getRequest().getHeader("X-Forwarded-For");
             if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-                return xForwardedFor.split(",")[0]; // Pega o IP original atrás do Cloudflare/Load Balancer
+                return xForwardedFor.split(",")[0];
             }
             return servletRequestAttributes.getRequest().getRemoteAddr();
         }

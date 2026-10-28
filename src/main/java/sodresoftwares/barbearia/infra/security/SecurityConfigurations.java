@@ -50,7 +50,7 @@ public class SecurityConfigurations {
                         .requestMatchers(HttpMethod.PATCH, "/auth/passwords").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/reactivate").permitAll()
                         .requestMatchers(HttpMethod.POST, "/webhooks/asaas").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/plans").permitAll() // <-- ROTA DE PLANOS PÚBLICA
+                        .requestMatchers(HttpMethod.GET, "/plans").permitAll()
                         .requestMatchers("/oauth2/**", "/barbearia/oauth2/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/error").permitAll()
@@ -64,11 +64,12 @@ public class SecurityConfigurations {
                         .requestMatchers(HttpMethod.POST, "/businesses").hasRole("PROFESSIONAL")
                         .requestMatchers(HttpMethod.GET, "/businesses/me").hasRole("PROFESSIONAL")
                         .requestMatchers(HttpMethod.PATCH, "/businesses/me").hasRole("PROFESSIONAL")
-                        .requestMatchers(HttpMethod.PUT, "/businesses/deactivate").hasRole("PROFESSIONAL") // <-- NOVA ROTA
-                        .requestMatchers(HttpMethod.PUT, "/businesses/reactivate").hasRole("PROFESSIONAL") // <-- NOVA ROTA
+                        .requestMatchers(HttpMethod.PUT, "/businesses/deactivate").hasRole("PROFESSIONAL")
+                        .requestMatchers(HttpMethod.PUT, "/businesses/reactivate").hasRole("PROFESSIONAL")
                         .requestMatchers(HttpMethod.POST, "/subscriptions/checkout").hasRole("PROFESSIONAL")
                         .requestMatchers(HttpMethod.POST, "/subscriptions/cancel/*").hasRole("PROFESSIONAL")
                         .requestMatchers(HttpMethod.GET, "/subscriptions/me").hasRole("PROFESSIONAL")
+                        .requestMatchers(HttpMethod.PUT, "/subscriptions/credit-card").hasRole("PROFESSIONAL")
 
                         // Dashboard
                         .requestMatchers(HttpMethod.GET, "/dashboard/professional").hasRole("PROFESSIONAL")
