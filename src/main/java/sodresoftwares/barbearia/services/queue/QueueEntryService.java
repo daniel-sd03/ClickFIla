@@ -343,7 +343,7 @@ public class QueueEntryService {
         if (!actionMember.getBusiness().getId().equals(session.getBusiness().getId())) {
             throw new AppException(
                     HttpStatus.FORBIDDEN,
-                    "FORBIDDEN",
+                    "NOT_BUSINESS_MEMBER",
                     "This member does not belong to this business.");
         }
 
@@ -367,7 +367,7 @@ public class QueueEntryService {
             log.warn("Security alert: User {} attempted to act as member {} without permission", loggedUserId, actionMemberId);
             throw new AppException(
                     HttpStatus.FORBIDDEN,
-                    "FORBIDDEN",
+                    "CANNOT_MANAGE_OTHER_MEMBER",
                     "You do not have permission to perform actions for this member.");
         }
 
@@ -388,7 +388,7 @@ public class QueueEntryService {
         TeamMember loggedMember = teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue(loggedUserId, businessId)
                 .orElseThrow(() -> new AppException(
                         HttpStatus.FORBIDDEN,
-                        "FORBIDDEN",
+                        "NOT_BUSINESS_MEMBER",
                         "You do not belong to the team of this business."));
 
         if (allowOwnerOverride && loggedMember.getRole() == TeamRole.OWNER) {
@@ -401,7 +401,7 @@ public class QueueEntryService {
                     loggedUserId, servedBy != null ? servedBy.getId() : "NONE");
             throw new AppException(
                     HttpStatus.FORBIDDEN,
-                    "FORBIDDEN",
+                    "CANNOT_MANAGE_OTHER_CLIENT",
                     "You can only manage the clients you are currently serving."
             );
         }
@@ -473,7 +473,7 @@ public class QueueEntryService {
         TeamMember loggedMember = teamMemberRepository.findByUserIdAndBusinessIdAndIsActiveTrue(loggedUserId, businessId)
                 .orElseThrow(() -> new AppException(
                         HttpStatus.FORBIDDEN,
-                        "FORBIDDEN",
+                        "NOT_BUSINESS_MEMBER",
                         "You do not belong to the team of this business."));
 
         boolean isOwner = loggedMember.getRole() == TeamRole.OWNER;
@@ -485,7 +485,7 @@ public class QueueEntryService {
             log.warn("Security alert: User {} attempted to cancel an entry without permission", loggedUserId);
             throw new AppException(
                     HttpStatus.FORBIDDEN,
-                    "FORBIDDEN",
+                    "CANCEL_NOT_ALLOWED",
                     "Only the business owner or the professional attending the client can cancel this entry."
             );
         }
