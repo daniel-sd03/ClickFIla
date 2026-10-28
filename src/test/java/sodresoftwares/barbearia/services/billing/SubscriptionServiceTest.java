@@ -160,6 +160,85 @@ class SubscriptionServiceTest {
                 .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
+    // ==================== UPDATE CREDIT CARD TESTS ====================
+
+    @Test
+    @DisplayName("Should update credit card successfully by updating existing payment method")
+    void testUpdateCreditCard_Success() {
+        // Arrange
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+
+        // Simula que a barbearia JÁ TEM um cartão cadastrado
+        BusinessPaymentMethod existingCard = BusinessPaymentMethod.builder()
+                .id("card-1")
+                .business(testBusiness)
+                .cardBrand("VISA")
+                .lastFourDigits("1111")
+                .creditCardToken("tok_old")
+                .build();
+        when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.of(existingCard));
+
+        // Simula o retorno do Asaas com os dados do NOVO cartão
+        GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-123", "tok_new999", "MASTERCARD", "4444");
+        when(paymentGatewayPort.updateSubscriptionCreditCard(eq("gw-sub-123"), any(), any())).thenReturn(mockResponse);
+
+        // Act
+        subscriptionService.updateCreditCard(USER_ID, testCheckoutRequest);
+
+        // Assert
+        // Verifica se ele chamou o save atualizando os dados do cartão já existente
+        verify(paymentMethodRepository).save(argThat(method ->
+                method.getId().equals("card-1") && // Manteve o ID antigo (Update)
+                        method.getCreditCardToken().equals("tok_new999") &&
+                        method.getCardBrand().equals("MASTERCARD") &&
+                        method.getLastFourDigits().equals("4444")
+        ));
+    }
+
+    @Test
+    @DisplayName("Should update credit card successfully by creating new payment method if none exists")
+    void testUpdateCreditCard_NewCard_Success() {
+        // Arrange
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+
+        // Simula que a barbearia NÃO TEM um cartão salvo ainda (Optional.empty)
+        when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.empty());
+
+        GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-123", "tok_new999", "MASTERCARD", "4444");
+        when(paymentGatewayPort.updateSubscriptionCreditCard(eq("gw-sub-123"), any(), any())).thenReturn(mockResponse);
+
+        // Act
+        subscriptionService.updateCreditCard(USER_ID, testCheckoutRequest);
+
+        // Assert
+        // Verifica se ele criou um novo objeto antes de salvar (INSERT)
+        verify(paymentMethodRepository).save(argThat(method ->
+                method.getId() == null && // ID nulo significa objeto novo (Insert)
+                        method.getCreditCardToken().equals("tok_new999") &&
+                        method.getBusiness().getId().equals(BUSINESS_ID)
+        ));
+    }
+
+    @Test
+    @DisplayName("Should throw exception when trying to update card for subscription without gateway link")
+    void testUpdateCreditCard_NoGatewayId() {
+        // Arrange
+        Subscription invalidSub = Subscription.builder()
+                .id("sub-555")
+                .business(testBusiness)
+                .gatewaySubscriptionId(null) // <-- Problema aqui
+                .build();
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(invalidSub));
+
+        // Act & Assert
+        assertThatThrownBy(() -> subscriptionService.updateCreditCard(USER_ID, testCheckoutRequest))
+                .isInstanceOf(AppException.class)
+                .hasMessage("This subscription does not have an active gateway link to update.")
+                .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(paymentGatewayPort, never()).updateSubscriptionCreditCard(any(), any(), any());
+    }
+
     // ==================== CANCEL SUBSCRIPTION TESTS ====================
 
     @Test
