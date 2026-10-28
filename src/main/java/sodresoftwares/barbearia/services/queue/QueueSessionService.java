@@ -156,7 +156,7 @@ public class QueueSessionService {
         if (member.getRole() != TeamRole.OWNER) {
             throw new AppException(
                     HttpStatus.FORBIDDEN,
-                    "ACCESS_DENIED",
+                    "OWNER_ONLY_ACTION",
                     "Only the business owner can perform this action.");
         }
 
