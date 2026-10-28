@@ -20,18 +20,17 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import sodresoftwares.barbearia.dto.billing.CheckoutRequest;
-import sodresoftwares.barbearia.dto.billing.CreditCardDTO;
-import sodresoftwares.barbearia.dto.billing.CreditCardHolderDTO;
-import sodresoftwares.barbearia.dto.billing.SubscriptionResponseDTO;
+import sodresoftwares.barbearia.dto.billing.*;
 import sodresoftwares.barbearia.infra.security.SecurityFilter;
 import sodresoftwares.barbearia.infra.security.SubscriptionCheckInterceptor;
 import sodresoftwares.barbearia.infra.security.WebMvcConfig;
+import sodresoftwares.barbearia.model.billing.BillingCycle;
 import sodresoftwares.barbearia.model.billing.SubscriptionStatus;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.model.user.UserRole;
 import sodresoftwares.barbearia.services.billing.SubscriptionService;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.mockito.ArgumentMatchers.nullable;
@@ -145,13 +144,24 @@ class SubscriptionControllerTest {
     // ==================== GET MY SUBSCRIPTION TESTS ====================
 
     @Test
-    @DisplayName("GET /subscriptions/me -> Should get logged user subscription details")
+    @DisplayName("Should get logged user subscription details")
     void shouldGetMySubscription() throws Exception {
+
+        PlanResponseDTO planDto = new PlanResponseDTO(
+                "plan-123",
+                "PRO_MONTHLY",
+                "Plano PRO",
+                new BigDecimal("50.00"),
+                BillingCycle.MONTHLY
+        );
+        CreditCardSummaryDTO cardDto = new CreditCardSummaryDTO("VISA", "1234");
+
         SubscriptionResponseDTO responseDTO = new SubscriptionResponseDTO(
                 SubscriptionStatus.ACTIVE,
-                "PRO_MONTHLY",
+                planDto,
                 LocalDate.now().plusDays(30),
-                null
+                false,
+                cardDto
         );
 
         when(subscriptionService.getMySubscriptionDetails(nullable(String.class)))
@@ -160,6 +170,7 @@ class SubscriptionControllerTest {
         mockMvc.perform(get("/subscriptions/me"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.planName").value("PRO_MONTHLY"));
+                .andExpect(jsonPath("$.plan.code").value("PRO_MONTHLY"))
+                .andExpect(jsonPath("$.creditCard.lastFourDigits").value("1234"));
     }
 }

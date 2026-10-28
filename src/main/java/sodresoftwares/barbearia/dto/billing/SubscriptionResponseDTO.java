@@ -5,7 +5,8 @@ import java.time.LocalDate;
 
 public record SubscriptionResponseDTO(
         SubscriptionStatus status,
-        String planName,
+        PlanResponseDTO plan,
         LocalDate currentPeriodEnd,
-        String paymentLink
+        boolean cancelAtPeriodEnd,
+        CreditCardSummaryDTO creditCard
 ) {}
