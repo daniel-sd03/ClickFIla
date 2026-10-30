@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import sodresoftwares.barbearia.dto.billing.ChangePlanDTO;
 import sodresoftwares.barbearia.dto.billing.CheckoutRequest;
 import sodresoftwares.barbearia.dto.billing.SubscriptionResponseDTO;
 import sodresoftwares.barbearia.model.user.User;
@@ -40,6 +41,15 @@ public class SubscriptionController {
     public ResponseEntity<Void> cancelSubscription(
             @PathVariable String businessId) {
         subscriptionService.cancelSubscription(businessId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/plan")
+    public ResponseEntity<Void> changePlan(
+            @Valid @RequestBody ChangePlanDTO request,
+            @AuthenticationPrincipal User loggedInUser) {
+
+        subscriptionService.changePlan(loggedInUser.getId(), request);
         return ResponseEntity.noContent().build();
     }
 

@@ -25,6 +25,7 @@ import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.ports.PaymentGatewayPort.GatewayCreditCardResponse;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -197,6 +198,41 @@ class AsaasPaymentAdapterTest {
         assertThat(response.creditCardToken()).isEqualTo("tok_new123");
         assertThat(response.cardBrand()).isEqualTo("MASTERCARD");
         assertThat(response.lastFourDigits()).isEqualTo("4444");
+    }
+
+    // ==================== SCHEDULED SUBSCRIPTION TESTS ====================
+
+    @Test
+    @DisplayName("Should create scheduled subscription successfully using existing token")
+    void shouldCreateScheduledSubscription() {
+        String expectedJsonResponse = """
+                {
+                    "id": "sub_scheduled_123",
+                    "creditCard": {
+                        "creditCardNumber": "4444",
+                        "creditCardBrand": "MASTERCARD",
+                        "creditCardToken": "tok_existing123"
+                    }
+                }
+                """;
+
+        LocalDate nextDueDate = LocalDate.now().plusDays(10);
+
+        mockServer.expect(requestTo(API_URL + "/subscriptions"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.billingType").value("CREDIT_CARD"))
+                .andExpect(jsonPath("$.nextDueDate").value(nextDueDate.toString()))
+                .andExpect(jsonPath("$.creditCardToken").value("tok_existing123"))
+                .andExpect(jsonPath("$.cycle").value("MONTHLY"))
+                .andRespond(withSuccess(expectedJsonResponse, MediaType.APPLICATION_JSON));
+
+        GatewayCreditCardResponse response = adapter.createScheduledSubscription(
+                testBusiness, testPlan, "cus_123", "tok_existing123", null, null, nextDueDate
+        );
+
+        assertThat(response).isNotNull();
+        assertThat(response.gatewaySubscriptionId()).isEqualTo("sub_scheduled_123");
+        assertThat(response.creditCardToken()).isEqualTo("tok_existing123");
     }
 
     // ==================== CANCEL SUBSCRIPTION TESTS ====================

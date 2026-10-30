@@ -122,6 +122,45 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
     }
 
     @Override
+    public GatewayCreditCardResponse createScheduledSubscription(
+            Business business,
+            Plan plan,
+            String gatewayCustomerId,
+            String creditCardToken,
+            CreditCardDTO creditCard,
+            CreditCardHolderDTO holderInfo,
+            LocalDate nextDueDate) {
+
+        String cycle = plan.getBillingCycle().name();
+
+        Map<String, Object> requestBody = new java.util.HashMap<>(Map.of(
+                "customer", gatewayCustomerId,
+                "billingType", "CREDIT_CARD",
+                "value", plan.getPrice(),
+                "nextDueDate", nextDueDate.toString(),
+                "cycle", cycle,
+                "description", plan.getCode(),
+                "externalReference", business.getId(),
+                "remoteIp", getClientIpAddress()
+        ));
+
+        if (creditCard != null && holderInfo != null) {
+            requestBody.put("creditCard", buildCreditCardPayload(creditCard));
+            requestBody.put("creditCardHolderInfo", buildHolderPayload(holderInfo));
+        } else {
+            requestBody.put("creditCardToken", creditCardToken);
+        }
+
+        return sendSubscriptionRequest(
+                HttpMethod.POST,
+                "/subscriptions",
+                null,
+                requestBody,
+                "Failed to schedule the new subscription. Check the payment method."
+        );
+    }
+
+    @Override
     public void cancelSubscription(String gatewaySubscriptionId) {
         restClient.delete()
                 .uri("/subscriptions/{id}", gatewaySubscriptionId)

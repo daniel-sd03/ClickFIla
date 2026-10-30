@@ -132,6 +132,19 @@ class SubscriptionControllerTest {
                 .andExpect(status().isOk());
     }
 
+    // ==================== PUT CHANGE PLAN TESTS ====================
+
+    @Test
+    @DisplayName("PUT /subscriptions/plan -> Should change plan successfully")
+    void shouldChangePlan() throws Exception {
+        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", null, null);
+
+        mockMvc.perform(put("/subscriptions/plan")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonTester.write(request).getJson()))
+                .andExpect(status().isNoContent());
+    }
+
     // ==================== POST CANCEL SUBSCRIPTION TESTS ====================
 
     @Test
