@@ -5,6 +5,8 @@ import sodresoftwares.barbearia.model.billing.Plan;
 import sodresoftwares.barbearia.dto.billing.CreditCardDTO;
 import sodresoftwares.barbearia.dto.billing.CreditCardHolderDTO;
 
+import java.time.LocalDate;
+
 public interface PaymentGatewayPort {
 
     /**
@@ -34,6 +36,19 @@ public interface PaymentGatewayPort {
             CreditCardHolderDTO holderInfo
     );
 
+    /**
+     * Creates a new subscription in the Gateway scheduled to charge on a specific future date.
+     * Used for upgrades/downgrades to maintain the current billing cycle without double charging.
+     */
+    GatewayCreditCardResponse createScheduledSubscription(
+            Business business,
+            Plan plan,
+            String gatewayCustomerId,
+            String creditCardToken,
+            CreditCardDTO creditCard,
+            CreditCardHolderDTO holderInfo,
+            LocalDate nextDueDate
+    );
     /**
      * Cancels the active subscription in the Gateway.
      */

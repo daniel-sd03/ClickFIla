@@ -6,16 +6,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import sodresoftwares.barbearia.dto.billing.CheckoutRequest;
-import sodresoftwares.barbearia.dto.billing.CreditCardSummaryDTO;
-import sodresoftwares.barbearia.dto.billing.PlanResponseDTO;
-import sodresoftwares.barbearia.dto.billing.SubscriptionResponseDTO;
+import sodresoftwares.barbearia.dto.billing.*;
 import sodresoftwares.barbearia.infra.exception.AppException;
 import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.billing.*;
 import sodresoftwares.barbearia.ports.PaymentGatewayPort;
 import sodresoftwares.barbearia.repositories.billing.BusinessPaymentMethodRepository;
-import sodresoftwares.barbearia.repositories.billing.PaymentRepository;
 import sodresoftwares.barbearia.repositories.billing.PlanRepository;
 import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;
 
@@ -31,7 +27,6 @@ public class SubscriptionService {
     private final SubscriptionRepository subscriptionRepository;
     private final PlanRepository planRepository;
     private final PaymentGatewayPort paymentGatewayPort;
-    private final PaymentRepository paymentRepository;
     private final BusinessPaymentMethodRepository paymentMethodRepository;
 
     @Value("${billing.trial.days}")
@@ -58,21 +53,18 @@ public class SubscriptionService {
 
     @Transactional
     public void processTransparentCheckout(String userId, CheckoutRequest request) {
-        Subscription subscription = subscriptionRepository.findByUserIdWithBusinessAndPlan(userId)
-                .orElseThrow(() -> new AppException(
-                        HttpStatus.NOT_FOUND,
-                        "SUBSCRIPTION_NOT_FOUND",
-                        "No subscription found for this user."
-                ));
+        Subscription subscription = getSubscriptionByUser(userId);
+
+        if (subscription.getStatus() == SubscriptionStatus.ACTIVE && subscription.getGatewaySubscriptionId() != null) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "ALREADY_ACTIVE",
+                    "You already have an active subscription. Use the change plan feature to switch to a new plan."
+            );
+        }
 
         Business business = subscription.getBusiness();
-
-        Plan plan = planRepository.findByCode(request.planId())
-                .orElseThrow(() -> new AppException(
-                        HttpStatus.NOT_FOUND,
-                        "PLAN_NOT_FOUND",
-                        "The selected plan is not available."
-                ));
+        Plan plan = getPlanByCode(request.planId());
 
         String customerId = paymentGatewayPort.createOrUpdateCustomer(business);
         subscription.setGatewayCustomerId(customerId);
@@ -85,43 +77,26 @@ public class SubscriptionService {
                 request.creditCardHolderInfo()
         );
 
-        BusinessPaymentMethod paymentMethod = paymentMethodRepository.findByBusinessId(business.getId())
-                .orElseGet(() -> BusinessPaymentMethod.builder()
-                        .business(business)
-                        .isDefault(true)
-                        .build());
-
+        BusinessPaymentMethod paymentMethod = getOrCreatePaymentMethod(business);
         paymentMethod.setCardBrand(checkoutResponse.cardBrand());
         paymentMethod.setLastFourDigits(checkoutResponse.lastFourDigits());
         paymentMethod.setCreditCardToken(checkoutResponse.creditCardToken());
-
         paymentMethodRepository.save(paymentMethod);
 
         subscription.setGatewaySubscriptionId(checkoutResponse.gatewaySubscriptionId());
         subscription.setPlan(plan);
         subscription.setStatus(SubscriptionStatus.ACTIVE);
         subscription.setCancelAtPeriodEnd(false);
-        subscriptionRepository.save(subscription);
+        subscription.setBillingAnchorDay(LocalDate.now(ZoneId.of("America/Sao_Paulo")).getDayOfMonth());
 
+        subscriptionRepository.save(subscription);
         log.info("Transparent checkout processed successfully for business {}.", business.getId());
     }
 
     @Transactional
     public void updateCreditCard(String userId, CheckoutRequest request) {
-        Subscription subscription = subscriptionRepository.findByUserIdWithBusinessAndPlan(userId)
-                .orElseThrow(() -> new AppException(
-                        HttpStatus.NOT_FOUND,
-                        "SUBSCRIPTION_NOT_FOUND",
-                        "No subscription found for this user."
-                ));
-
-        if (subscription.getGatewaySubscriptionId() == null) {
-            throw new AppException(
-                    HttpStatus.BAD_REQUEST,
-                    "INVALID_SUBSCRIPTION",
-                    "This subscription does not have an active gateway link to update."
-            );
-        }
+        Subscription subscription = getSubscriptionByUser(userId);
+        requireGatewaySubscriptionId(subscription);
 
         var gatewayResponse = paymentGatewayPort.updateSubscriptionCreditCard(
                 subscription.getGatewaySubscriptionId(),
@@ -129,21 +104,66 @@ public class SubscriptionService {
                 request.creditCardHolderInfo()
         );
 
-        Business business = subscription.getBusiness();
-
-        BusinessPaymentMethod paymentMethod = paymentMethodRepository.findByBusinessId(business.getId())
-                .orElseGet(() -> BusinessPaymentMethod.builder()
-                        .business(business)
-                        .isDefault(true)
-                        .build());
-
+        BusinessPaymentMethod paymentMethod = getOrCreatePaymentMethod(subscription.getBusiness());
         paymentMethod.setCardBrand(gatewayResponse.cardBrand());
         paymentMethod.setLastFourDigits(gatewayResponse.lastFourDigits());
         paymentMethod.setCreditCardToken(gatewayResponse.creditCardToken());
-
         paymentMethodRepository.save(paymentMethod);
 
-        log.info("Credit card updated successfully for business {}.", business.getId());
+        log.info("Credit card updated successfully for business {}.", subscription.getBusiness().getId());
+    }
+
+    @Transactional
+    public void changePlan(String userId, ChangePlanDTO request) {
+        Subscription subscription = getSubscriptionByUser(userId);
+        requireGatewaySubscriptionId(subscription);
+
+        if (subscription.getStatus() != SubscriptionStatus.ACTIVE) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_STATUS",
+                    "You can only change the plan of an active subscription."
+            );
+        }
+
+        if (subscription.getPlan().getCode().equals(request.planId())) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "SAME_PLAN",
+                    "You are already subscribed to this plan."
+            );
+        }
+
+        Plan newPlan = getPlanByCode(request.planId());
+        BusinessPaymentMethod paymentMethod = getExistingPaymentMethod(subscription.getBusiness().getId());
+
+        paymentGatewayPort.cancelSubscription(subscription.getGatewaySubscriptionId());
+
+        String savedToken = request.creditCard() == null ? paymentMethod.getCreditCardToken() : null;
+
+        var gatewayResponse = paymentGatewayPort.createScheduledSubscription(
+                subscription.getBusiness(),
+                newPlan,
+                subscription.getGatewayCustomerId(),
+                savedToken,
+                request.creditCard(),
+                request.creditCardHolderInfo(),
+                subscription.getCurrentPeriodEnd()
+        );
+
+        if (request.creditCard() != null) {
+            paymentMethod.setCardBrand(gatewayResponse.cardBrand());
+            paymentMethod.setLastFourDigits(gatewayResponse.lastFourDigits());
+            paymentMethod.setCreditCardToken(gatewayResponse.creditCardToken());
+            paymentMethodRepository.save(paymentMethod);
+        }
+
+        subscription.setGatewaySubscriptionId(gatewayResponse.gatewaySubscriptionId());
+        subscription.setPlan(newPlan);
+        subscriptionRepository.save(subscription);
+
+        log.info("Plan changed successfully for business {} to plan {}. Scheduled to start charging on {}",
+                subscription.getBusiness().getId(), newPlan.getCode(), subscription.getCurrentPeriodEnd());
     }
 
     @Transactional
@@ -169,12 +189,7 @@ public class SubscriptionService {
     }
 
     public SubscriptionResponseDTO getMySubscriptionDetails(String userId) {
-        Subscription subscription = subscriptionRepository.findByUserIdWithBusinessAndPlan(userId)
-                .orElseThrow(() -> new AppException(
-                        HttpStatus.NOT_FOUND,
-                        "SUBSCRIPTION_NOT_FOUND",
-                        "Subscription not found for this user."
-                ));
+        Subscription subscription = getSubscriptionByUser(userId);
 
         PlanResponseDTO planDto = subscription.getPlan() != null
                 ? PlanResponseDTO.fromEntity(subscription.getPlan())
@@ -192,6 +207,20 @@ public class SubscriptionService {
                 cardDto
         );
     }
+
+    // ==========================================
+    // AUXILIARY METHODS & DATA FETCHING
+    // ==========================================
+
+    private Subscription getSubscriptionByUser(String userId) {
+        return subscriptionRepository.findByUserIdWithBusinessAndPlan(userId)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.NOT_FOUND,
+                        "SUBSCRIPTION_NOT_FOUND",
+                        "No subscription found for this user."
+                ));
+    }
+
     private Subscription getSubscriptionByBusiness(String businessId) {
         return subscriptionRepository.findByBusinessIdWithBusiness(businessId)
                 .orElseThrow(() -> new AppException(
@@ -199,5 +228,41 @@ public class SubscriptionService {
                         "SUBSCRIPTION_NOT_FOUND",
                         "No subscription found for this business."
                 ));
+    }
+
+    private Plan getPlanByCode(String planCode) {
+        return planRepository.findByCode(planCode)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.NOT_FOUND,
+                        "PLAN_NOT_FOUND",
+                        "The selected plan is not available."
+                ));
+    }
+
+    private BusinessPaymentMethod getOrCreatePaymentMethod(Business business) {
+        return paymentMethodRepository.findByBusinessId(business.getId())
+                .orElseGet(() -> BusinessPaymentMethod.builder()
+                        .business(business)
+                        .isDefault(true)
+                        .build());
+    }
+
+    private BusinessPaymentMethod getExistingPaymentMethod(String businessId) {
+        return paymentMethodRepository.findByBusinessId(businessId)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.NOT_FOUND,
+                        "PAYMENT_METHOD_NOT_FOUND",
+                        "Payment method not found."
+                ));
+    }
+
+    private void requireGatewaySubscriptionId(Subscription subscription) {
+        if (subscription.getGatewaySubscriptionId() == null) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_SUBSCRIPTION",
+                    "This subscription does not have an active gateway link."
+            );
+        }
     }
 }

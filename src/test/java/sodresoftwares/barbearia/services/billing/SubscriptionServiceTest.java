@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
+import sodresoftwares.barbearia.dto.billing.ChangePlanDTO;
 import sodresoftwares.barbearia.dto.billing.CheckoutRequest;
 import sodresoftwares.barbearia.dto.billing.CreditCardDTO;
 import sodresoftwares.barbearia.dto.billing.CreditCardHolderDTO;
@@ -111,6 +112,9 @@ class SubscriptionServiceTest {
     @Test
     @DisplayName("Should process transparent checkout, save card token and update subscription")
     void testProcessTransparentCheckout_Success() {
+        testSubscription.setStatus(SubscriptionStatus.TRIAL);
+        testSubscription.setGatewaySubscriptionId(null);
+
         // Arrange
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
         when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
@@ -163,6 +167,8 @@ class SubscriptionServiceTest {
     @Test
     @DisplayName("Should throw exception when plan is not found during transparent checkout")
     void testProcessTransparentCheckout_PlanNotFound() {
+        testSubscription.setStatus(SubscriptionStatus.TRIAL);
+
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
         when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.empty());
 
@@ -173,7 +179,6 @@ class SubscriptionServiceTest {
 
         verify(paymentMethodRepository, never()).save(any());
     }
-
     @Test
     @DisplayName("Should throw exception when user has no subscription during checkout")
     void testProcessTransparentCheckout_SubscriptionNotFound() {
@@ -191,9 +196,6 @@ class SubscriptionServiceTest {
     @DisplayName("Should update credit card successfully by updating existing payment method")
     void testUpdateCreditCard_Success() {
         // Arrange
-        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
-
-        // Simula que a barbearia JÁ TEM um cartão cadastrado
         BusinessPaymentMethod existingCard = BusinessPaymentMethod.builder()
                 .id("card-1")
                 .business(testBusiness)
@@ -201,9 +203,10 @@ class SubscriptionServiceTest {
                 .lastFourDigits("1111")
                 .creditCardToken("tok_old")
                 .build();
+
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
         when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.of(existingCard));
 
-        // Simula o retorno do Asaas com os dados do NOVO cartão
         GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-123", "tok_new999", "MASTERCARD", "4444");
         when(paymentGatewayPort.updateSubscriptionCreditCard(eq("gw-sub-123"), any(), any())).thenReturn(mockResponse);
 
@@ -211,7 +214,6 @@ class SubscriptionServiceTest {
         subscriptionService.updateCreditCard(USER_ID, testCheckoutRequest);
 
         // Assert
-        // Verifica se ele chamou o save atualizando os dados do cartão já existente
         verify(paymentMethodRepository).save(argThat(method ->
                 method.getId().equals("card-1") && // Manteve o ID antigo (Update)
                         method.getCreditCardToken().equals("tok_new999") &&
@@ -225,8 +227,6 @@ class SubscriptionServiceTest {
     void testUpdateCreditCard_NewCard_Success() {
         // Arrange
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
-
-        // Simula que a barbearia NÃO TEM um cartão salvo ainda (Optional.empty)
         when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.empty());
 
         GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-123", "tok_new999", "MASTERCARD", "4444");
@@ -236,9 +236,8 @@ class SubscriptionServiceTest {
         subscriptionService.updateCreditCard(USER_ID, testCheckoutRequest);
 
         // Assert
-        // Verifica se ele criou um novo objeto antes de salvar (INSERT)
         verify(paymentMethodRepository).save(argThat(method ->
-                method.getId() == null && // ID nulo significa objeto novo (Insert)
+                method.getId() == null &&
                         method.getCreditCardToken().equals("tok_new999") &&
                         method.getBusiness().getId().equals(BUSINESS_ID)
         ));
@@ -247,21 +246,85 @@ class SubscriptionServiceTest {
     @Test
     @DisplayName("Should throw exception when trying to update card for subscription without gateway link")
     void testUpdateCreditCard_NoGatewayId() {
-        // Arrange
         Subscription invalidSub = Subscription.builder()
                 .id("sub-555")
                 .business(testBusiness)
-                .gatewaySubscriptionId(null) // <-- Problema aqui
+                .gatewaySubscriptionId(null)
                 .build();
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(invalidSub));
 
-        // Act & Assert
         assertThatThrownBy(() -> subscriptionService.updateCreditCard(USER_ID, testCheckoutRequest))
                 .isInstanceOf(AppException.class)
-                .hasMessage("This subscription does not have an active gateway link to update.")
+                .hasMessage("This subscription does not have an active gateway link.")
                 .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
 
         verify(paymentGatewayPort, never()).updateSubscriptionCreditCard(any(), any(), any());
+    }
+
+    // ==================== CHANGE PLAN TESTS ====================
+
+    @Test
+    @DisplayName("Should change plan successfully using saved credit card token")
+    void testChangePlan_Success_SavedToken() {
+        // Arrange
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+
+        Plan newPlan = Plan.builder().id("plan-456").code("PRO_YEARLY").name("Plano Anual").build();
+        when(planRepository.findByCode("PRO_YEARLY")).thenReturn(Optional.of(newPlan));
+
+        BusinessPaymentMethod savedMethod = BusinessPaymentMethod.builder()
+                .business(testBusiness)
+                .creditCardToken("tok_123")
+                .build();
+        when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.of(savedMethod));
+
+        GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-new123", "tok_123", "VISA", "1111");
+
+        when(paymentGatewayPort.createScheduledSubscription(
+                eq(testBusiness), eq(newPlan), eq("gw-cus-123"), eq("tok_123"), isNull(), isNull(), eq(testSubscription.getCurrentPeriodEnd())
+        )).thenReturn(mockResponse);
+
+        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", null, null);
+
+        // Act
+        subscriptionService.changePlan(USER_ID, request);
+
+        // Assert
+        verify(paymentGatewayPort).cancelSubscription("gw-sub-123");
+
+        verify(subscriptionRepository).save(argThat(sub ->
+                sub.getPlan().getCode().equals("PRO_YEARLY") &&
+                        sub.getGatewaySubscriptionId().equals("gw-sub-new123")
+        ));
+    }
+
+    @Test
+    @DisplayName("Should throw exception when trying to change to the same plan")
+    void testChangePlan_SamePlan() {
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+
+        ChangePlanDTO request = new ChangePlanDTO(PLAN_CODE, null, null);
+
+        assertThatThrownBy(() -> subscriptionService.changePlan(USER_ID, request))
+                .isInstanceOf(AppException.class)
+                .hasMessage("You are already subscribed to this plan.")
+                .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(paymentGatewayPort, never()).cancelSubscription(any());
+    }
+
+    @Test
+    @DisplayName("Should throw exception when trying to change plan on an inactive subscription")
+    void testChangePlan_InactiveSubscription() {
+        testSubscription.setStatus(SubscriptionStatus.CANCELED);
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+
+        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", null, null);
+
+        assertThatThrownBy(() -> subscriptionService.changePlan(USER_ID, request))
+                .isInstanceOf(AppException.class)
+                .hasMessage("You can only change the plan of an active subscription.")
+                .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     // ==================== CANCEL SUBSCRIPTION TESTS ====================
