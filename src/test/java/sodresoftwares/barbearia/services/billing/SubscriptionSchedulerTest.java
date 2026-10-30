@@ -220,4 +220,28 @@ class SubscriptionSchedulerTest {
         verify(subscriptionHistoryService, never()).logStatusChange(any(), any(), any());
         verify(paymentGatewayPort, never()).cancelSubscription(anyString());
     }
+
+    @Test
+    @DisplayName("Should process abandoned pending subscriptions, call gateway and update status to CANCELED")
+    void testProcessDailySubscriptions_AbandonedPending() {
+        // Arrange
+        mockSubscription.setStatus(SubscriptionStatus.PENDING);
+        when(subscriptionRepository.findByStatusAndCurrentPeriodStartBefore(
+                eq(SubscriptionStatus.PENDING), any(LocalDate.class)))
+                .thenReturn(List.of(mockSubscription));
+
+        // Act
+        scheduler.processDailySubscriptions();
+
+        // Assert
+        assertThat(mockSubscription.getStatus()).isEqualTo(SubscriptionStatus.CANCELED);
+
+        verify(paymentGatewayPort).cancelSubscription(GATEWAY_SUB_ID);
+        verify(subscriptionHistoryService).logStatusChange(
+                mockSubscription,
+                SubscriptionStatus.CANCELED,
+                "SCHEDULER: ABANDONED_CHECKOUT"
+        );
+        verify(subscriptionRepository).saveAll(List.of(mockSubscription));
+    }
 }

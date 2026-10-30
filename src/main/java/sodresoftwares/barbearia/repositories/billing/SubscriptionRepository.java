@@ -42,6 +42,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     """)
     Optional<SubscriptionStatus> findSubscriptionStatusByUserId(@Param("userId") String userId);
 
+    List<Subscription> findByStatusAndCurrentPeriodStartBefore(SubscriptionStatus status, LocalDate date);
     boolean existsByBusinessId(String businessId);
     Optional<Subscription> findByBusinessId(String businessId);
     List<Subscription> findByStatusAndCurrentPeriodEndBefore(SubscriptionStatus status, LocalDate date);

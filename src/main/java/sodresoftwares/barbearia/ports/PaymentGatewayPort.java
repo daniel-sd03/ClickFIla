@@ -1,5 +1,6 @@
 package sodresoftwares.barbearia.ports;
 
+import sodresoftwares.barbearia.dto.billing.CheckoutResponseDTO;
 import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.billing.Plan;
 import sodresoftwares.barbearia.dto.billing.CreditCardDTO;
@@ -49,6 +50,13 @@ public interface PaymentGatewayPort {
             CreditCardHolderDTO holderInfo,
             LocalDate nextDueDate
     );
+
+    /**
+     * Processes a PIX subscription checkout.
+     * Returns the PIX QR Code payload and Base64 image for the first invoice.
+     */
+    CheckoutResponseDTO processPixCheckout(Business business, Plan plan, String gatewayCustomerId);
+
     /**
      * Cancels the active subscription in the Gateway.
      */

@@ -8,6 +8,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import sodresoftwares.barbearia.dto.billing.ChangePlanDTO;
 import sodresoftwares.barbearia.dto.billing.CheckoutRequest;
+import sodresoftwares.barbearia.dto.billing.CheckoutResponseDTO;
 import sodresoftwares.barbearia.dto.billing.SubscriptionResponseDTO;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.services.billing.SubscriptionService;
@@ -22,11 +23,17 @@ public class SubscriptionController {
     private final SubscriptionService subscriptionService;
 
     @PostMapping("/checkout")
-    public ResponseEntity<Void> processCheckout(
-            @AuthenticationPrincipal User loggedInUser,
-            @Valid @RequestBody CheckoutRequest request) {
-        subscriptionService.processTransparentCheckout(loggedInUser.getId(), request);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<CheckoutResponseDTO> processCheckout(
+            @Valid @RequestBody CheckoutRequest request,
+            @AuthenticationPrincipal User loggedInUser) {
+
+        CheckoutResponseDTO response = subscriptionService.processTransparentCheckout(loggedInUser.getId(), request);
+
+        if (response != null) {
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.noContent().build();
+        }
     }
 
     @PutMapping("/credit-card")

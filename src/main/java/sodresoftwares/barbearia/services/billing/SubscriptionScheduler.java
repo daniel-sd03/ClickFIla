@@ -46,6 +46,7 @@ public class SubscriptionScheduler {
         processDefinitiveCancellations(today);
         processExpiredPendingPayments(today);
         processScheduledCancellations(today);
+        processAbandonedPendingSubscriptions(today);
 
         log.info("Nightly subscription verification completed.");
     }
@@ -61,7 +62,8 @@ public class SubscriptionScheduler {
                     "SCHEDULER: TRIAL_EXPIRED"
             );
             subscription.setStatus(SubscriptionStatus.SUSPENDED);
-            log.info("Trial expired for business {}. Status changed to SUSPENDED.", subscription.getBusiness().getId());
+            log.info("Trial expired for business {}. Status changed to SUSPENDED.",
+                    subscription.getBusiness().getId());
         }
         subscriptionRepository.saveAll(expiredTrials);
     }
@@ -103,7 +105,8 @@ public class SubscriptionScheduler {
                 try {
                     paymentGatewayPort.cancelSubscription(subscription.getGatewaySubscriptionId());
                 } catch (Exception e) {
-                    log.error("Failed to cancel subscription {} in gateway.", subscription.getGatewaySubscriptionId(), e);
+                    log.error("Failed to cancel subscription {} in gateway.",
+                            subscription.getGatewaySubscriptionId(), e);
                 }
             }
             log.info("Subscription {} definitively CANCELED due to {} days of non-payment.",
@@ -139,5 +142,34 @@ public class SubscriptionScheduler {
             log.info("Subscription {} CANCELED at period end by user request.", subscription.getId());
         }
         subscriptionRepository.saveAll(scheduledCancellations);
+    }
+
+    private void processAbandonedPendingSubscriptions(LocalDate today) {
+        LocalDate cutoffDate = today.minusDays(2);
+
+        List<Subscription> abandonedSubscriptions = subscriptionRepository
+                .findByStatusAndCurrentPeriodStartBefore(SubscriptionStatus.PENDING, cutoffDate);
+
+        for (Subscription subscription : abandonedSubscriptions) {
+            subscriptionHistoryService.logStatusChange(
+                    subscription,
+                    SubscriptionStatus.CANCELED,
+                    "SCHEDULER: ABANDONED_CHECKOUT"
+            );
+
+            subscription.setStatus(SubscriptionStatus.CANCELED);
+
+            if (subscription.getGatewaySubscriptionId() != null) {
+                try {
+                    paymentGatewayPort.cancelSubscription(subscription.getGatewaySubscriptionId());
+                } catch (Exception e) {
+                    log.error("Failed to cancel abandoned subscription {} in gateway.",
+                            subscription.getGatewaySubscriptionId(), e);
+                }
+            }
+
+            log.info("Abandoned PENDING subscription {} CANCELED by scheduler.", subscription.getId());
+        }
+        subscriptionRepository.saveAll(abandonedSubscriptions);
     }
 }

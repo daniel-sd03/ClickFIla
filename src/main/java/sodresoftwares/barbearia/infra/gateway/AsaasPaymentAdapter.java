@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import sodresoftwares.barbearia.dto.billing.CheckoutResponseDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
 import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.billing.Plan;
@@ -17,6 +18,7 @@ import sodresoftwares.barbearia.dto.billing.CreditCardHolderDTO;
 
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -157,6 +159,73 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
                 null,
                 requestBody,
                 "Failed to schedule the new subscription. Check the payment method."
+        );
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public CheckoutResponseDTO processPixCheckout(Business business, Plan plan, String gatewayCustomerId) {
+        String cycle = plan.getBillingCycle().name();
+
+        var requestBody = Map.of(
+                "customer", gatewayCustomerId,
+                "billingType", "PIX",
+                "value", plan.getPrice(),
+                "nextDueDate", LocalDate.now().toString(),
+                "cycle", cycle,
+                "description", plan.getCode(),
+                "externalReference", business.getId()
+        );
+
+        var subscriptionResponse = restClient.post()
+                .uri("/subscriptions")
+                .body(requestBody)
+                .retrieve()
+                .body(Map.class);
+
+        if (subscriptionResponse == null || !subscriptionResponse.containsKey("id")) {
+            throw new AppException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "GATEWAY_ERROR",
+                    "Failed to create PIX subscription."
+            );
+        }
+
+        String subscriptionId = (String) subscriptionResponse.get("id");
+
+        var paymentsResponse = restClient.get()
+                .uri("/payments?subscription=" + subscriptionId)
+                .retrieve()
+                .body(Map.class);
+
+        List<Map<String, Object>> payments = (List<Map<String, Object>>) paymentsResponse.get("data");
+        if (payments == null || payments.isEmpty()) {
+            throw new AppException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "GATEWAY_ERROR",
+                    "No invoice generated for this PIX subscription."
+            );
+        }
+
+        String firstPaymentId = (String) payments.get(0).get("id");
+
+        var pixResponse = restClient.get()
+                .uri("/payments/{id}/pixQrCode", firstPaymentId)
+                .retrieve()
+                .body(Map.class);
+
+        if (pixResponse == null || !pixResponse.containsKey("payload")) {
+            throw new AppException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "GATEWAY_ERROR",
+                    "Failed to retrieve PIX QR Code."
+            );
+        }
+
+        return new CheckoutResponseDTO(
+                subscriptionId,
+                (String) pixResponse.get("encodedImage"),
+                (String) pixResponse.get("payload")
         );
     }
 
