@@ -52,45 +52,60 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public void processTransparentCheckout(String userId, CheckoutRequest request) {
+    public CheckoutResponseDTO processTransparentCheckout(String userId, CheckoutRequest request) {
         Subscription subscription = getSubscriptionByUser(userId);
 
         if (subscription.getStatus() == SubscriptionStatus.ACTIVE && subscription.getGatewaySubscriptionId() != null) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
                     "ALREADY_ACTIVE",
-                    "You already have an active subscription. Use the change plan feature to switch to a new plan."
+                    "You already have an active subscription."
             );
         }
 
         Business business = subscription.getBusiness();
         Plan plan = getPlanByCode(request.planId());
-
         String customerId = paymentGatewayPort.createOrUpdateCustomer(business);
         subscription.setGatewayCustomerId(customerId);
+        LocalDate today = LocalDate.now(ZoneId.of("America/Sao_Paulo"));
 
-        var checkoutResponse = paymentGatewayPort.processCreditCardCheckout(
-                business,
-                plan,
-                customerId,
-                request.creditCard(),
-                request.creditCardHolderInfo()
-        );
-
-        BusinessPaymentMethod paymentMethod = getOrCreatePaymentMethod(business);
-        paymentMethod.setCardBrand(checkoutResponse.cardBrand());
-        paymentMethod.setLastFourDigits(checkoutResponse.lastFourDigits());
-        paymentMethod.setCreditCardToken(checkoutResponse.creditCardToken());
-        paymentMethodRepository.save(paymentMethod);
-
-        subscription.setGatewaySubscriptionId(checkoutResponse.gatewaySubscriptionId());
-        subscription.setPlan(plan);
-        subscription.setStatus(SubscriptionStatus.ACTIVE);
+        subscription.setStatus(SubscriptionStatus.PENDING);
+        subscription.setCurrentPeriodStart(today);
+        subscription.setBillingAnchorDay(today.getDayOfMonth());
         subscription.setCancelAtPeriodEnd(false);
-        subscription.setBillingAnchorDay(LocalDate.now(ZoneId.of("America/Sao_Paulo")).getDayOfMonth());
 
-        subscriptionRepository.save(subscription);
-        log.info("Transparent checkout processed successfully for business {}.", business.getId());
+        if ("CREDIT_CARD".equalsIgnoreCase(request.paymentMethod())) {
+            var checkoutResponse = paymentGatewayPort.processCreditCardCheckout(
+                    business, plan, customerId, request.creditCard(), request.creditCardHolderInfo()
+            );
+
+            BusinessPaymentMethod paymentMethod = getOrCreatePaymentMethod(business);
+            paymentMethod.setCardBrand(checkoutResponse.cardBrand());
+            paymentMethod.setLastFourDigits(checkoutResponse.lastFourDigits());
+            paymentMethod.setCreditCardToken(checkoutResponse.creditCardToken());
+            paymentMethodRepository.save(paymentMethod);
+
+            subscription.setGatewaySubscriptionId(checkoutResponse.gatewaySubscriptionId());
+            subscriptionRepository.save(subscription);
+
+            log.info("Credit Card checkout processed for business {}. Waiting for webhook confirmation.", business.getId());
+            return null;
+
+        } else if ("PIX".equalsIgnoreCase(request.paymentMethod())) {
+            var pixResponse = paymentGatewayPort.processPixCheckout(business, plan, customerId);
+
+            subscription.setGatewaySubscriptionId(pixResponse.gatewaySubscriptionId());
+            subscriptionRepository.save(subscription);
+
+            log.info("PIX checkout processed for business {}. Waiting for payment.", business.getId());
+            return pixResponse;
+        } else {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_PAYMENT_METHOD",
+                    "Supported methods are CREDIT_CARD or PIX."
+            );
+        }
     }
 
     @Transactional

@@ -86,9 +86,27 @@ class SubscriptionServiceTest {
 
         testPayment = Payment.builder().id("pay-123").status(PaymentStatus.OVERDUE).invoiceUrl("https://link").build();
 
-        CreditCardDTO ccDto = new CreditCardDTO("DANIEL", "4111111111111111", "12", "2028", "123");
-        CreditCardHolderDTO holderDto = new CreditCardHolderDTO("Daniel", "test@test.com", "12345678909", "30123456", "100", null, "31999999999", null);
-        testCheckoutRequest = new CheckoutRequest(PLAN_CODE, ccDto, holderDto);
+        CreditCardDTO ccDto = new CreditCardDTO(
+                "DANIEL",
+                "4111111111111111",
+                "12",
+                "2028",
+                "123"
+        );
+        CreditCardHolderDTO holderDto = new CreditCardHolderDTO(
+                "Daniel",
+                "test@test.com",
+                "12345678909",
+                "30123456",
+                "100",
+                null,
+                "31999999999",
+                null
+        );
+        testCheckoutRequest = new CheckoutRequest(
+                PLAN_CODE,
+                "CREDIT_CARD",
+                ccDto, holderDto);
     }
 
     // ==================== CREATE TRIAL TESTS ====================
@@ -139,30 +157,30 @@ class SubscriptionServiceTest {
         ));
     }
 
-    @Test
-    @DisplayName("Should reactivate a previously canceled subscription during transparent checkout (Churn Recovery)")
-    void testProcessTransparentCheckout_ReactivateCanceledSubscription() {
-        // Arrange
-        testSubscription.setStatus(SubscriptionStatus.CANCELED);
-        testSubscription.setCancelAtPeriodEnd(true);
+        @Test
+        @DisplayName("Should reactivate a previously canceled subscription during transparent checkout (Churn Recovery)")
+        void testProcessTransparentCheckout_ReactivateCanceledSubscription() {
+            // Arrange
+            testSubscription.setStatus(SubscriptionStatus.CANCELED);
+            testSubscription.setCancelAtPeriodEnd(true);
 
-        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
-        when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
-        when(paymentGatewayPort.createOrUpdateCustomer(testBusiness)).thenReturn("gw-cus-999");
+            when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+            when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
+            when(paymentGatewayPort.createOrUpdateCustomer(testBusiness)).thenReturn("gw-cus-999");
 
-        GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-new123", "tok_new", "VISA", "1234");
-        when(paymentGatewayPort.processCreditCardCheckout(eq(testBusiness), eq(testPlan), eq("gw-cus-999"), any(), any())).thenReturn(mockResponse);
+            GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-new123", "tok_new", "VISA", "1234");
+            when(paymentGatewayPort.processCreditCardCheckout(eq(testBusiness), eq(testPlan), eq("gw-cus-999"), any(), any())).thenReturn(mockResponse);
 
-        // Act
-        subscriptionService.processTransparentCheckout(USER_ID, testCheckoutRequest);
+            // Act
+            subscriptionService.processTransparentCheckout(USER_ID, testCheckoutRequest);
 
-        // Assert
-        verify(subscriptionRepository).save(argThat(sub ->
-                sub.getGatewaySubscriptionId().equals("gw-sub-new123") &&
-                        sub.getStatus() == SubscriptionStatus.ACTIVE &&
-                        sub.getCancelAtPeriodEnd() == false
-        ));
-    }
+            // Assert
+            verify(subscriptionRepository).save(argThat(sub ->
+                    sub.getGatewaySubscriptionId().equals("gw-sub-new123") &&
+                            sub.getStatus() == SubscriptionStatus.PENDING &&
+                            sub.getCancelAtPeriodEnd() == false
+            ));
+        }
 
     @Test
     @DisplayName("Should throw exception when plan is not found during transparent checkout")

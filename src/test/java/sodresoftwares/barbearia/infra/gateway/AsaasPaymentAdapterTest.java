@@ -235,6 +235,55 @@ class AsaasPaymentAdapterTest {
         assertThat(response.creditCardToken()).isEqualTo("tok_existing123");
     }
 
+    // ==================== PIX CHECKOUT TESTS ====================
+
+    @Test
+    @DisplayName("Should process PIX checkout and return QR Code data successfully")
+    void shouldProcessPixCheckoutSuccessfully() {
+        String subscriptionJsonResponse = """
+                {
+                    "id": "sub_pix123"
+                }
+                """;
+
+        String paymentsJsonResponse = """
+                {
+                    "data": [
+                        { "id": "pay_pix123" }
+                    ]
+                }
+                """;
+
+        String qrCodeJsonResponse = """
+                {
+                    "encodedImage": "base64_image_data",
+                    "payload": "pix_copy_paste_data"
+                }
+                """;
+
+        mockServer.expect(requestTo(API_URL + "/subscriptions"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.billingType").value("PIX"))
+                .andExpect(jsonPath("$.customer").value("cus_123"))
+                .andRespond(withSuccess(subscriptionJsonResponse, MediaType.APPLICATION_JSON));
+
+        mockServer.expect(requestTo(API_URL + "/payments?subscription=sub_pix123"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(paymentsJsonResponse, MediaType.APPLICATION_JSON));
+
+        mockServer.expect(requestTo(API_URL + "/payments/pay_pix123/pixQrCode"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(qrCodeJsonResponse, MediaType.APPLICATION_JSON));
+
+        sodresoftwares.barbearia.dto.billing.CheckoutResponseDTO response =
+                adapter.processPixCheckout(testBusiness, testPlan, "cus_123");
+
+        assertThat(response).isNotNull();
+        assertThat(response.gatewaySubscriptionId()).isEqualTo("sub_pix123");
+        assertThat(response.pixQrCodeBase64()).isEqualTo("base64_image_data");
+        assertThat(response.pixCopiaECola()).isEqualTo("pix_copy_paste_data");
+    }
+
     // ==================== CANCEL SUBSCRIPTION TESTS ====================
 
     @Test

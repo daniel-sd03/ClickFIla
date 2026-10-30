@@ -8,6 +8,9 @@ public record CheckoutRequest(
         @NotBlank(message = "Plan ID is required")
         String planId,
 
+        @NotBlank(message = "Payment method is required (CREDIT_CARD or PIX)")
+        String paymentMethod,
+
         @NotNull(message = "Credit card data is required")
         @Valid
         CreditCardDTO creditCard,

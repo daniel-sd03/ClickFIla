@@ -106,15 +106,17 @@ class SubscriptionControllerTest {
         );
 
         CreditCardHolderDTO holderInfo = new CreditCardHolderDTO(
-                "João Fernandes", "test@test.com", "12345678909", "30123456", "100", null, "31999999999", null
+                "João Fernandes", "test@test.com", "12345678909",
+                "30123456", "100", null, "31999999999", null
         );
 
-        CheckoutRequest request = new CheckoutRequest("PRO_MONTHLY", creditCard, holderInfo);
+        CheckoutRequest request = new CheckoutRequest("PRO_MONTHLY", "CREDIT_CARD",
+                creditCard, holderInfo);
 
         mockMvc.perform(post("/subscriptions/checkout")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonTester.write(request).getJson()))
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
     }
 
     // ==================== PUT UPDATE CREDIT CARD TESTS ====================
@@ -122,9 +124,13 @@ class SubscriptionControllerTest {
     @Test
     @DisplayName("PUT /subscriptions/credit-card -> Should update credit card successfully")
     void shouldUpdateCreditCard() throws Exception {
-        CreditCardDTO creditCard = new CreditCardDTO("João F", "4111111111111111", "12", "2028", "123");
-        CreditCardHolderDTO holderInfo = new CreditCardHolderDTO("João F", "test@test.com", "12345678909", "30123456", "100", null, "31999999999", null);
-        CheckoutRequest request = new CheckoutRequest("PRO_MONTHLY", creditCard, holderInfo);
+        CreditCardDTO creditCard = new CreditCardDTO("João F", "4111111111111111",
+                "12", "2028", "123");
+        CreditCardHolderDTO holderInfo = new CreditCardHolderDTO("João F", "test@test.com",
+                "12345678909", "30123456", "100", null, "31999999999", null);
+
+        CheckoutRequest request = new CheckoutRequest("PRO_MONTHLY", "CREDIT_CARD",
+                creditCard, holderInfo);
 
         mockMvc.perform(put("/subscriptions/credit-card")
                         .contentType(MediaType.APPLICATION_JSON)
