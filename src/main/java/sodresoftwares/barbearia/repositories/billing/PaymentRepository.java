@@ -2,6 +2,7 @@ package sodresoftwares.barbearia.repositories.billing;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import sodresoftwares.barbearia.dto.billing.CheckoutResponseDTO;
 import sodresoftwares.barbearia.model.billing.Payment;
 import sodresoftwares.barbearia.model.billing.PaymentStatus;
@@ -19,7 +20,17 @@ public interface PaymentRepository extends JpaRepository<Payment, String> {
             "DESC LIMIT 1")
     Optional<Payment> findLatestPendingOrOverduePayment(String subscriptionId);
 
-    boolean existsBySubscriptionIdAndStatusIn(String subscriptionId, List<PaymentStatus> statuses);
+    @Query("SELECT COUNT(p) > 0 FROM Payment p " +
+            "WHERE p.subscription.id = :subscriptionId " +
+            "AND p.status " +
+            "IN :statuses " +
+            "AND p.dueDate <= :currentDate")
+    boolean existsBySubscriptionIdAndStatusInAndDueDateBeforeOrEqual(
+            @Param("subscriptionId") String subscriptionId,
+            @Param("statuses") List<PaymentStatus> statuses,
+            @Param("currentDate") LocalDate currentDate
+    );
+
     Optional<Payment> findFirstBySubscriptionIdAndStatusOrderByIdDesc(String subscriptionId, PaymentStatus status);
     boolean existsByGatewayInvoiceId(String gatewayInvoiceId);
     Optional<Payment> findByGatewayInvoiceId(String gatewayInvoiceId);

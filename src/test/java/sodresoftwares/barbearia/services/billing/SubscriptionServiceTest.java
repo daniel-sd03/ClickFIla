@@ -22,6 +22,7 @@ import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -462,5 +463,44 @@ class SubscriptionServiceTest {
         assertThat(testSubscription.getCancelAtPeriodEnd()).isTrue();
         verify(paymentGatewayPort).cancelSubscription("gw-sub-123");
         verify(subscriptionRepository).save(testSubscription);
+    }
+
+    // ==================== GET MY SUBSCRIPTION DETAILS TESTS ====================
+
+    @Test
+    @DisplayName("Should get subscription details and calculate pending payments with date threshold")
+    void testGetMySubscriptionDetails_Success() {
+        // Arrange
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+
+        BusinessPaymentMethod existingCard = BusinessPaymentMethod.builder()
+                .cardBrand("MASTERCARD")
+                .lastFourDigits("9999")
+                .build();
+        when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.of(existingCard));
+
+        // Mocka
+        when(paymentRepository.existsBySubscriptionIdAndStatusInAndDueDateBeforeOrEqual(
+                eq(testSubscription.getId()),
+                eq(List.of(PaymentStatus.PENDING, PaymentStatus.OVERDUE)),
+                any(LocalDate.class)
+        )).thenReturn(true);
+
+        // Act
+        SubscriptionResponseDTO result = subscriptionService.getMySubscriptionDetails(USER_ID);
+
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.status()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(result.plan().code()).isEqualTo(PLAN_CODE);
+        assertThat(result.creditCard().brand()).isEqualTo("MASTERCARD");
+        assertThat(result.creditCard().lastFourDigits()).isEqualTo("9999");
+        assertThat(result.hasPendingPayment()).isTrue();
+
+        verify(paymentRepository).existsBySubscriptionIdAndStatusInAndDueDateBeforeOrEqual(
+                eq(testSubscription.getId()),
+                anyList(),
+                any(LocalDate.class)
+        );
     }
 }
