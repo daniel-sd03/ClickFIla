@@ -263,34 +263,85 @@ public class SubscriptionService {
     private CheckoutResponseDTO handleCreditCardCheckout(
             Subscription subscription, Business business, Plan plan, String customerId, CheckoutRequestDTO request) {
 
-        var checkoutResponse = paymentGatewayPort.processCreditCardCheckout(
-                business, plan, customerId, request.creditCard(), request.creditCardHolderInfo()
-        );
+        boolean hasValidDays = subscription.getCurrentPeriodEnd() != null
+                && !subscription.getCurrentPeriodEnd().isBefore(LocalDate.now(ZoneId.of("America/Sao_Paulo")));
+
+        PaymentGatewayPort.GatewayCreditCardResponse gatewayResponse;
+
+        if (hasValidDays) {
+            gatewayResponse = paymentGatewayPort.createScheduledSubscription(
+                    business,
+                    plan,
+                    customerId,
+                    PaymentMethod.CREDIT_CARD,
+                    null,
+                    request.creditCard(),
+                    request.creditCardHolderInfo(),
+                    subscription.getCurrentPeriodEnd()
+            );
+
+            subscription.setStatus(SubscriptionStatus.ACTIVE);
+            log.info("Subscription reactivated and scheduled to charge on {}", subscription.getCurrentPeriodEnd());
+        } else {
+            gatewayResponse = paymentGatewayPort.processCreditCardCheckout(
+                    business, plan, customerId, request.creditCard(), request.creditCardHolderInfo()
+            );
+            subscription.setStatus(SubscriptionStatus.PENDING);
+        }
 
         BusinessPaymentMethod paymentMethod = getOrCreatePaymentMethod(business);
-        paymentMethod.setCardBrand(checkoutResponse.cardBrand());
-        paymentMethod.setLastFourDigits(checkoutResponse.lastFourDigits());
-        paymentMethod.setCreditCardToken(checkoutResponse.creditCardToken());
+
+        String brand = gatewayResponse.cardBrand();
+        String lastFour = gatewayResponse.lastFourDigits() != null ? gatewayResponse.lastFourDigits() : request.creditCard().number().substring(request.creditCard().number().length() - 4);
+
+        paymentMethod.setCardBrand(brand);
+        paymentMethod.setLastFourDigits(lastFour);
+        paymentMethod.setCreditCardToken(gatewayResponse.creditCardToken());
         paymentMethodRepository.save(paymentMethod);
 
-        subscription.setStatus(SubscriptionStatus.PENDING);
-        subscription.setGatewaySubscriptionId(checkoutResponse.gatewaySubscriptionId());
+        subscription.setGatewaySubscriptionId(gatewayResponse.gatewaySubscriptionId());
+        subscription.setCancelAtPeriodEnd(false);
         subscriptionRepository.save(subscription);
 
-        log.info("Credit Card checkout processed for business {}. Waiting for webhook confirmation.", business.getId());
+        log.info("Credit Card checkout processed for business {}.", business.getId());
+
         return null;
     }
 
     private CheckoutResponseDTO handlePixCheckout(
             Subscription subscription, Business business, Plan plan, String customerId) {
 
-        var pixResponse = paymentGatewayPort.processPixCheckout(business, plan, customerId);
+        boolean hasValidDays = subscription.getCurrentPeriodEnd() != null
+                && !subscription.getCurrentPeriodEnd().isBefore(LocalDate.now(ZoneId.of("America/Sao_Paulo")));
 
-        subscription.setStatus(SubscriptionStatus.PENDING);
+        CheckoutResponseDTO pixResponse;
+
+        if (hasValidDays) {
+            var gatewayResponse = paymentGatewayPort.createScheduledSubscription(
+                    business,
+                    plan,
+                    customerId,
+                    PaymentMethod.PIX,
+                    null,
+                    null,
+                    null,
+                    subscription.getCurrentPeriodEnd()
+            );
+
+            pixResponse = new CheckoutResponseDTO(gatewayResponse.gatewaySubscriptionId(), null, null);
+
+            subscription.setStatus(SubscriptionStatus.ACTIVE);
+            log.info("Subscription reactivated and scheduled to start charging PIX on {}", subscription.getCurrentPeriodEnd());
+        } else {
+            pixResponse = paymentGatewayPort.processPixCheckout(business, plan, customerId);
+            subscription.setStatus(SubscriptionStatus.PENDING);
+        }
+
         subscription.setGatewaySubscriptionId(pixResponse.gatewaySubscriptionId());
+        subscription.setCancelAtPeriodEnd(false);
         subscriptionRepository.save(subscription);
 
-        log.info("PIX checkout processed for business {}. Waiting for webhook and payment.", business.getId());
+        log.info("PIX checkout processed for business {}.", business.getId());
         return pixResponse;
     }
 

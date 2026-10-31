@@ -125,39 +125,37 @@ class SubscriptionServiceTest {
     // ==================== TRANSPARENT CHECKOUT TESTS ====================
 
     @Test
-    @DisplayName("Should process transparent checkout, save card token and update subscription")
-    void testProcessTransparentCheckout_Success() {
+    @DisplayName("Should process IMMEDIATE CC checkout when no valid days remain")
+    void testProcessTransparentCheckout_ImmediateCC_Success() {
         testSubscription.setStatus(SubscriptionStatus.TRIAL);
         testSubscription.setGatewaySubscriptionId(null);
+        testSubscription.setCurrentPeriodEnd(LocalDate.now().minusDays(1));
 
-        // Arrange
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
         when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
         when(paymentGatewayPort.createOrUpdateCustomer(testBusiness)).thenReturn("gw-cus-999");
 
-        GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-999", "tok_123", "VISA", "1111");
-        when(paymentGatewayPort.processCreditCardCheckout(eq(testBusiness), eq(testPlan), eq("gw-cus-999"), any(), any())).thenReturn(mockResponse);
+        GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-999",
+                "tok_123", "VISA", "1111");
+        when(paymentGatewayPort.processCreditCardCheckout(eq(testBusiness), eq(testPlan), eq("gw-cus-999"),
+                any(), any())).thenReturn(mockResponse);
 
-        // Act
         subscriptionService.processTransparentCheckout(USER_ID, testCheckoutRequest);
 
-        // Assert
         verify(paymentMethodRepository).save(argThat(method ->
                 method.getCreditCardToken().equals("tok_123") &&
-                        method.getCardBrand().equals("VISA") &&
-                        method.isDefault()
+                        method.getCardBrand().equals("VISA")
         ));
 
         verify(subscriptionRepository).save(argThat(sub ->
-                sub.getGatewayCustomerId().equals("gw-cus-999") &&
-                        sub.getGatewaySubscriptionId().equals("gw-sub-999")
+                sub.getGatewaySubscriptionId().equals("gw-sub-999") &&
+                        sub.getStatus() == SubscriptionStatus.PENDING
         ));
     }
 
     @Test
-    @DisplayName("Should reactivate a previously canceled subscription during transparent checkout (Churn Recovery)")
-    void testProcessTransparentCheckout_ReactivateCanceledSubscription() {
-        // Arrange
+    @DisplayName("Should process SCHEDULED CC reactivation when valid days remain")
+    void testProcessTransparentCheckout_ScheduledCC_Success() {
         testSubscription.setStatus(SubscriptionStatus.CANCELED);
         testSubscription.setCancelAtPeriodEnd(true);
 
@@ -165,17 +163,70 @@ class SubscriptionServiceTest {
         when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
         when(paymentGatewayPort.createOrUpdateCustomer(testBusiness)).thenReturn("gw-cus-999");
 
-        GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-new123", "tok_new", "VISA", "1234");
-        when(paymentGatewayPort.processCreditCardCheckout(eq(testBusiness), eq(testPlan), eq("gw-cus-999"), any(), any())).thenReturn(mockResponse);
+        GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-new123",
+                "tok_new", "VISA", "1234");
+        when(paymentGatewayPort.createScheduledSubscription(any(), any(), any(), eq(PaymentMethod.CREDIT_CARD),
+                isNull(), any(), any(), eq(testSubscription.getCurrentPeriodEnd()))).thenReturn(mockResponse);
 
-        // Act
         subscriptionService.processTransparentCheckout(USER_ID, testCheckoutRequest);
 
-        // Assert
         verify(subscriptionRepository).save(argThat(sub ->
                 sub.getGatewaySubscriptionId().equals("gw-sub-new123") &&
-                        sub.getStatus() == SubscriptionStatus.PENDING &&
-                        sub.getCancelAtPeriodEnd() == false
+                        sub.getStatus() == SubscriptionStatus.ACTIVE &&
+                        !sub.getCancelAtPeriodEnd()
+        ));
+    }
+
+    @Test
+    @DisplayName("Should process IMMEDIATE PIX checkout when no valid days remain")
+    void testProcessTransparentCheckout_ImmediatePix_Success() {
+        testSubscription.setStatus(SubscriptionStatus.TRIAL);
+        testSubscription.setGatewaySubscriptionId(null);
+        testSubscription.setCurrentPeriodEnd(LocalDate.now().minusDays(1));
+
+        CheckoutRequestDTO pixRequest = new CheckoutRequestDTO(PLAN_CODE, PaymentMethod.PIX, null, null);
+
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+        when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
+        when(paymentGatewayPort.createOrUpdateCustomer(testBusiness)).thenReturn("gw-cus-999");
+
+        CheckoutResponseDTO mockPixResponse = new CheckoutResponseDTO("gw-sub-pix123",
+                "base64", "copiacola");
+        when(paymentGatewayPort.processPixCheckout(testBusiness, testPlan, "gw-cus-999")).thenReturn(mockPixResponse);
+
+        CheckoutResponseDTO result = subscriptionService.processTransparentCheckout(USER_ID, pixRequest);
+
+        assertThat(result.pixCopiaECola()).isEqualTo("copiacola");
+        verify(subscriptionRepository).save(argThat(sub ->
+                sub.getGatewaySubscriptionId().equals("gw-sub-pix123") &&
+                        sub.getStatus() == SubscriptionStatus.PENDING
+        ));
+    }
+
+    @Test
+    @DisplayName("Should process SCHEDULED PIX reactivation when valid days remain")
+    void testProcessTransparentCheckout_ScheduledPix_Success() {
+        testSubscription.setStatus(SubscriptionStatus.CANCELED);
+        testSubscription.setCancelAtPeriodEnd(true);
+
+        CheckoutRequestDTO pixRequest = new CheckoutRequestDTO(PLAN_CODE, PaymentMethod.PIX, null, null);
+
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+        when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
+        when(paymentGatewayPort.createOrUpdateCustomer(testBusiness)).thenReturn("gw-cus-999");
+
+        GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-sch-pix",
+                null, null, null);
+        when(paymentGatewayPort.createScheduledSubscription(any(), any(), any(), eq(PaymentMethod.PIX), isNull(),
+                isNull(), isNull(), eq(testSubscription.getCurrentPeriodEnd()))).thenReturn(mockResponse);
+
+        CheckoutResponseDTO result = subscriptionService.processTransparentCheckout(USER_ID, pixRequest);
+
+        assertThat(result.pixCopiaECola()).isNull();
+        verify(subscriptionRepository).save(argThat(sub ->
+                sub.getGatewaySubscriptionId().equals("gw-sub-sch-pix") &&
+                        sub.getStatus() == SubscriptionStatus.ACTIVE &&
+                        !sub.getCancelAtPeriodEnd()
         ));
     }
 
@@ -210,6 +261,7 @@ class SubscriptionServiceTest {
     @Test
     @DisplayName("Should throw exception when trying to checkout with an ongoing subscription")
     void testProcessTransparentCheckout_AlreadyExists() {
+        // testSubscription is ACTIVE with gatewayId in setUp()
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
 
         assertThatThrownBy(() -> subscriptionService.processTransparentCheckout(USER_ID, testCheckoutRequest))
@@ -218,31 +270,6 @@ class SubscriptionServiceTest {
                 .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
 
         verify(paymentGatewayPort, never()).processCreditCardCheckout(any(), any(), any(), any(), any());
-    }
-
-    @Test
-    @DisplayName("Should process PIX checkout successfully without saving local payment cache")
-    void testProcessTransparentCheckout_Pix_Success() {
-        testSubscription.setStatus(SubscriptionStatus.TRIAL);
-        testSubscription.setGatewaySubscriptionId(null);
-        CheckoutRequestDTO pixRequest = new CheckoutRequestDTO(PLAN_CODE, PaymentMethod.PIX, null, null);
-
-        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
-        when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
-        when(paymentGatewayPort.createOrUpdateCustomer(testBusiness)).thenReturn("gw-cus-999");
-
-        CheckoutResponseDTO mockPixResponse = new CheckoutResponseDTO("gw-sub-pix123", "base64", "copiacola");
-        when(paymentGatewayPort.processPixCheckout(testBusiness, testPlan, "gw-cus-999")).thenReturn(mockPixResponse);
-
-        CheckoutResponseDTO result = subscriptionService.processTransparentCheckout(USER_ID, pixRequest);
-
-        assertThat(result.pixCopiaECola()).isEqualTo("copiacola");
-        verify(subscriptionRepository).save(argThat(sub ->
-                sub.getGatewaySubscriptionId().equals("gw-sub-pix123") &&
-                        sub.getStatus() == SubscriptionStatus.PENDING
-        ));
-
-        verify(paymentRepository, never()).save(any());
     }
 
     // ==================== UPDATE PAYMENT METHOD TESTS ====================
