@@ -1,5 +1,6 @@
 package sodresoftwares.barbearia.dto.billing;
 
+import sodresoftwares.barbearia.model.billing.PaymentMethod;
 import sodresoftwares.barbearia.model.billing.SubscriptionStatus;
 import java.time.LocalDate;
 
@@ -9,5 +10,6 @@ public record SubscriptionResponseDTO(
         LocalDate currentPeriodEnd,
         boolean cancelAtPeriodEnd,
         CreditCardSummaryDTO creditCard,
-        boolean hasPendingPayment
+        boolean hasPendingPayment,
+        PaymentMethod activePaymentMethod
 ) {}
