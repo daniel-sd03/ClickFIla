@@ -241,9 +241,12 @@ public class SubscriptionService {
                 .map(method -> new CreditCardSummaryDTO(method.getCardBrand(), method.getLastFourDigits()))
                 .orElse(null);
 
-        boolean hasPending = paymentRepository.existsBySubscriptionIdAndStatusIn(
+        LocalDate alertDateThreshold = LocalDate.now(ZoneId.of("America/Sao_Paulo")).plusDays(5);
+
+        boolean hasPending = paymentRepository.existsBySubscriptionIdAndStatusInAndDueDateBeforeOrEqual(
                 subscription.getId(),
-                List.of(PaymentStatus.PENDING, PaymentStatus.OVERDUE)
+                List.of(PaymentStatus.PENDING, PaymentStatus.OVERDUE),
+                alertDateThreshold
         );
 
         return new SubscriptionResponseDTO(
