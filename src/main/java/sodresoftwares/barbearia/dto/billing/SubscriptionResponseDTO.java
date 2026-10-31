@@ -8,5 +8,6 @@ public record SubscriptionResponseDTO(
         PlanResponseDTO plan,
         LocalDate currentPeriodEnd,
         boolean cancelAtPeriodEnd,
-        CreditCardSummaryDTO creditCard
+        CreditCardSummaryDTO creditCard,
+        boolean hasPendingPayment
 ) {}

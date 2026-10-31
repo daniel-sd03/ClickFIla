@@ -207,6 +207,44 @@ class SubscriptionServiceTest {
                 .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
+    @Test
+    @DisplayName("Should throw exception when trying to checkout with an ongoing subscription")
+    void testProcessTransparentCheckout_AlreadyExists() {
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+
+        assertThatThrownBy(() -> subscriptionService.processTransparentCheckout(USER_ID, testCheckoutRequest))
+                .isInstanceOf(AppException.class)
+                .hasMessage("You already have an ongoing or active subscription. Use the payment method update endpoint.")
+                .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(paymentGatewayPort, never()).processCreditCardCheckout(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Should process PIX checkout successfully without saving local payment cache")
+    void testProcessTransparentCheckout_Pix_Success() {
+        testSubscription.setStatus(SubscriptionStatus.TRIAL);
+        testSubscription.setGatewaySubscriptionId(null);
+        CheckoutRequestDTO pixRequest = new CheckoutRequestDTO(PLAN_CODE, PaymentMethod.PIX, null, null);
+
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+        when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
+        when(paymentGatewayPort.createOrUpdateCustomer(testBusiness)).thenReturn("gw-cus-999");
+
+        CheckoutResponseDTO mockPixResponse = new CheckoutResponseDTO("gw-sub-pix123", "base64", "copiacola");
+        when(paymentGatewayPort.processPixCheckout(testBusiness, testPlan, "gw-cus-999")).thenReturn(mockPixResponse);
+
+        CheckoutResponseDTO result = subscriptionService.processTransparentCheckout(USER_ID, pixRequest);
+
+        assertThat(result.pixCopiaECola()).isEqualTo("copiacola");
+        verify(subscriptionRepository).save(argThat(sub ->
+                sub.getGatewaySubscriptionId().equals("gw-sub-pix123") &&
+                        sub.getStatus() == SubscriptionStatus.PENDING
+        ));
+
+        verify(paymentRepository, never()).save(any());
+    }
+
     // ==================== UPDATE PAYMENT METHOD TESTS ====================
 
     @Test
@@ -319,6 +357,41 @@ class SubscriptionServiceTest {
         verify(subscriptionRepository).save(argThat(sub ->
                 sub.getGatewaySubscriptionId().equals("gw-sub-new123")
         ));
+    }
+
+    // ==================== PENDING PIX QR CODE TESTS ====================
+
+    @Test
+    @DisplayName("Should get pending PIX QR Code from local payment repository")
+    void testGetPendingPixQrCode_Found() {
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+
+        Payment pendingPayment = Payment.builder()
+                .pixQrCodeBase64("base64_cached")
+                .pixCopyPaste("copiacola_cached")
+                .build();
+
+        when(paymentRepository.findFirstBySubscriptionIdAndStatusOrderByIdDesc(testSubscription.getId(), PaymentStatus.PENDING))
+                .thenReturn(Optional.of(pendingPayment));
+
+        CheckoutResponseDTO result = subscriptionService.getPendingPixQrCode(USER_ID);
+
+        assertThat(result).isNotNull();
+        assertThat(result.pixCopiaECola()).isEqualTo("copiacola_cached");
+        assertThat(result.gatewaySubscriptionId()).isEqualTo("gw-sub-123");
+    }
+
+    @Test
+    @DisplayName("Should return null if no pending PIX is found in local cache")
+    void testGetPendingPixQrCode_NotFound() {
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+
+        when(paymentRepository.findFirstBySubscriptionIdAndStatusOrderByIdDesc(testSubscription.getId(), PaymentStatus.PENDING))
+                .thenReturn(Optional.empty());
+
+        CheckoutResponseDTO result = subscriptionService.getPendingPixQrCode(USER_ID);
+
+        assertThat(result).isNull();
     }
 
     @Test

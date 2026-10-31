@@ -121,6 +121,24 @@ class SubscriptionControllerTest {
                 .andExpect(status().isNoContent());
     }
 
+    @Test
+    @DisplayName("POST /subscriptions/checkout -> Should process PIX checkout and return 200 OK with QR Code")
+    void shouldProcessPixCheckout() throws Exception {
+        CheckoutRequestDTO request = new CheckoutRequestDTO("PRO_MONTHLY", PaymentMethod.PIX, null,
+                null);
+
+        CheckoutResponseDTO mockResponse = new CheckoutResponseDTO("sub-123",
+                "base64_checkout", "copiacola_checkout");
+        when(subscriptionService.processTransparentCheckout(any(), any())).thenReturn(mockResponse);
+
+        mockMvc.perform(post("/subscriptions/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonTester.write(request).getJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pixQrCodeBase64").value("base64_checkout"))
+                .andExpect(jsonPath("$.pixCopiaECola").value("copiacola_checkout"));
+    }
+
     // ==================== PUT UPDATE PAYMENT METHOD TESTS ====================
 
     @Test
@@ -131,7 +149,8 @@ class SubscriptionControllerTest {
         CreditCardHolderDTO holderInfo = new CreditCardHolderDTO("João F", "test@test.com",
                 "12345678909", "30123456", "100", null,
                 "31999999999", null);
-        CheckoutRequestDTO request = new CheckoutRequestDTO("PRO_MONTHLY", PaymentMethod.CREDIT_CARD, creditCard, holderInfo);
+        CheckoutRequestDTO request = new CheckoutRequestDTO("PRO_MONTHLY", PaymentMethod.CREDIT_CARD,
+                creditCard, holderInfo);
 
         // O Mock
         when(subscriptionService.updatePaymentMethod(any(), any())).thenReturn(null);
@@ -169,6 +188,15 @@ class SubscriptionControllerTest {
         mockMvc.perform(get("/subscriptions/pix-qr-code"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pixCopiaECola").value("copiacola"));
+    }
+
+    @Test
+    @DisplayName("GET /subscriptions/pix-qr-code -> Should return 204 No Content when no PIX is pending")
+    void shouldGetPixQrCodeNoContent() throws Exception {
+        when(subscriptionService.getPendingPixQrCode(any())).thenReturn(null);
+
+        mockMvc.perform(get("/subscriptions/pix-qr-code"))
+                .andExpect(status().isNoContent());
     }
 
     // ==================== PUT CHANGE PLAN TESTS ====================
@@ -213,7 +241,8 @@ class SubscriptionControllerTest {
                 planDto,
                 LocalDate.now().plusDays(30),
                 false,
-                cardDto
+                cardDto,
+                false
         );
 
         when(subscriptionService.getMySubscriptionDetails(nullable(String.class)))
@@ -223,6 +252,7 @@ class SubscriptionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.plan.code").value("PRO_MONTHLY"))
-                .andExpect(jsonPath("$.creditCard.lastFourDigits").value("1234"));
+                .andExpect(jsonPath("$.creditCard.lastFourDigits").value("1234"))
+                .andExpect(jsonPath("$.hasPendingPayment").value(false));
     }
 }
