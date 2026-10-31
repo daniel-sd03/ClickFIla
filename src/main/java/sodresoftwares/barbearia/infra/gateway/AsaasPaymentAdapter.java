@@ -12,6 +12,7 @@ import sodresoftwares.barbearia.dto.billing.CheckoutResponseDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
 import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.billing.Plan;
+import sodresoftwares.barbearia.model.billing.PaymentMethod;
 import sodresoftwares.barbearia.ports.PaymentGatewayPort;
 import sodresoftwares.barbearia.dto.billing.CreditCardDTO;
 import sodresoftwares.barbearia.dto.billing.CreditCardHolderDTO;
@@ -82,7 +83,7 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
 
         var requestBody = Map.of(
                 "customer", gatewayCustomerId,
-                "billingType", "CREDIT_CARD",
+                "billingType", PaymentMethod.CREDIT_CARD.name(),
                 "value", plan.getPrice(),
                 "nextDueDate", LocalDate.now().toString(),
                 "cycle", cycle,
@@ -102,24 +103,27 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
     }
 
     @Override
-    public GatewayCreditCardResponse updateSubscriptionCreditCard(
+    public GatewayCreditCardResponse updateSubscriptionPaymentMethod(
             String gatewaySubscriptionId,
+            PaymentMethod paymentMethod,
             CreditCardDTO creditCard,
             CreditCardHolderDTO holderInfo) {
 
-        var requestBody = Map.of(
-                "billingType", "CREDIT_CARD",
-                "creditCard", buildCreditCardPayload(creditCard),
-                "creditCardHolderInfo", buildHolderPayload(holderInfo),
-                "remoteIp", getClientIpAddress()
-        );
+        Map<String, Object> requestBody = new java.util.HashMap<>();
+        requestBody.put("billingType", paymentMethod.name());
+        requestBody.put("remoteIp", getClientIpAddress());
+
+        if (paymentMethod == PaymentMethod.CREDIT_CARD) {
+            requestBody.put("creditCard", buildCreditCardPayload(creditCard));
+            requestBody.put("creditCardHolderInfo", buildHolderPayload(holderInfo));
+        }
 
         return sendSubscriptionRequest(
                 HttpMethod.PUT,
                 "/subscriptions/{id}",
                 gatewaySubscriptionId,
                 requestBody,
-                "The new card was declined or the provided data is invalid."
+                "Failed to update payment method."
         );
     }
 
@@ -128,6 +132,7 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
             Business business,
             Plan plan,
             String gatewayCustomerId,
+            PaymentMethod paymentMethod,
             String creditCardToken,
             CreditCardDTO creditCard,
             CreditCardHolderDTO holderInfo,
@@ -135,22 +140,23 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
 
         String cycle = plan.getBillingCycle().name();
 
-        Map<String, Object> requestBody = new java.util.HashMap<>(Map.of(
-                "customer", gatewayCustomerId,
-                "billingType", "CREDIT_CARD",
-                "value", plan.getPrice(),
-                "nextDueDate", nextDueDate.toString(),
-                "cycle", cycle,
-                "description", plan.getCode(),
-                "externalReference", business.getId(),
-                "remoteIp", getClientIpAddress()
-        ));
+        Map<String, Object> requestBody = new java.util.HashMap<>();
+        requestBody.put("customer", gatewayCustomerId);
+        requestBody.put("billingType", paymentMethod.name());
+        requestBody.put("value", plan.getPrice());
+        requestBody.put("nextDueDate", nextDueDate.toString());
+        requestBody.put("cycle", cycle);
+        requestBody.put("description", plan.getCode());
+        requestBody.put("externalReference", business.getId());
+        requestBody.put("remoteIp", getClientIpAddress());
 
-        if (creditCard != null && holderInfo != null) {
-            requestBody.put("creditCard", buildCreditCardPayload(creditCard));
-            requestBody.put("creditCardHolderInfo", buildHolderPayload(holderInfo));
-        } else {
-            requestBody.put("creditCardToken", creditCardToken);
+        if (paymentMethod == PaymentMethod.CREDIT_CARD) {
+            if (creditCard != null && holderInfo != null) {
+                requestBody.put("creditCard", buildCreditCardPayload(creditCard));
+                requestBody.put("creditCardHolderInfo", buildHolderPayload(holderInfo));
+            } else {
+                requestBody.put("creditCardToken", creditCardToken);
+            }
         }
 
         return sendSubscriptionRequest(
@@ -169,7 +175,7 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
 
         var requestBody = Map.of(
                 "customer", gatewayCustomerId,
-                "billingType", "PIX",
+                "billingType", PaymentMethod.PIX.name(),
                 "value", plan.getPrice(),
                 "nextDueDate", LocalDate.now().toString(),
                 "cycle", cycle,

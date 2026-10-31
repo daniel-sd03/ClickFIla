@@ -21,6 +21,7 @@ import sodresoftwares.barbearia.infra.exception.AppException;
 import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.billing.BillingCycle;
 import sodresoftwares.barbearia.model.billing.Plan;
+import sodresoftwares.barbearia.model.billing.PaymentMethod; // 👈 IMPORT ADICIONADO
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.ports.PaymentGatewayPort.GatewayCreditCardResponse;
 
@@ -191,7 +192,9 @@ class AsaasPaymentAdapterTest {
                 .andExpect(jsonPath("$.creditCard.holderName").value("DANIEL S S PAULA"))
                 .andRespond(withSuccess(expectedJsonResponse, MediaType.APPLICATION_JSON));
 
-        GatewayCreditCardResponse response = adapter.updateSubscriptionCreditCard(gatewaySubscriptionId, testCreditCard, testHolder);
+        GatewayCreditCardResponse response = adapter.updateSubscriptionPaymentMethod(
+                gatewaySubscriptionId, PaymentMethod.CREDIT_CARD, testCreditCard, testHolder
+        );
 
         assertThat(response).isNotNull();
         assertThat(response.gatewaySubscriptionId()).isEqualTo("sub_123");
@@ -227,7 +230,7 @@ class AsaasPaymentAdapterTest {
                 .andRespond(withSuccess(expectedJsonResponse, MediaType.APPLICATION_JSON));
 
         GatewayCreditCardResponse response = adapter.createScheduledSubscription(
-                testBusiness, testPlan, "cus_123", "tok_existing123", null, null, nextDueDate
+                testBusiness, testPlan, "cus_123", PaymentMethod.CREDIT_CARD, "tok_existing123", null, null, nextDueDate
         );
 
         assertThat(response).isNotNull();
