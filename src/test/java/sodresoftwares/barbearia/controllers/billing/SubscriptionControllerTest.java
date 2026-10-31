@@ -34,6 +34,7 @@ import sodresoftwares.barbearia.services.billing.SubscriptionService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -123,20 +124,51 @@ class SubscriptionControllerTest {
     // ==================== PUT UPDATE PAYMENT METHOD TESTS ====================
 
     @Test
-    @DisplayName("PUT /subscriptions/payment-method -> Should update payment method successfully")
-    void shouldUpdatePaymentMethod() throws Exception {
+    @DisplayName("PUT /subscriptions/payment-method -> Should update credit card and return 204 No Content")
+    void shouldUpdatePaymentMethodCreditCard() throws Exception {
         CreditCardDTO creditCard = new CreditCardDTO("João F", "4111111111111111",
                 "12", "2028", "123");
         CreditCardHolderDTO holderInfo = new CreditCardHolderDTO("João F", "test@test.com",
-                "12345678909", "30123456", "100", null, "31999999999", null);
+                "12345678909", "30123456", "100", null,
+                "31999999999", null);
+        CheckoutRequestDTO request = new CheckoutRequestDTO("PRO_MONTHLY", PaymentMethod.CREDIT_CARD, creditCard, holderInfo);
 
-        CheckoutRequestDTO request = new CheckoutRequestDTO("PRO_MONTHLY", PaymentMethod.CREDIT_CARD,
-                creditCard, holderInfo);
+        // O Mock
+        when(subscriptionService.updatePaymentMethod(any(), any())).thenReturn(null);
 
         mockMvc.perform(put("/subscriptions/payment-method")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonTester.write(request).getJson()))
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("PUT /subscriptions/payment-method -> Should update to PIX and return 200 OK with QR Code")
+    void shouldUpdatePaymentMethodPix() throws Exception {
+        CheckoutRequestDTO request = new CheckoutRequestDTO("PRO_MONTHLY", PaymentMethod.PIX,
+                null, null);
+        CheckoutResponseDTO mockResponse = new CheckoutResponseDTO("sub-123",
+                "base64", "copiacola");
+
+        when(subscriptionService.updatePaymentMethod(any(), any())).thenReturn(mockResponse);
+
+        mockMvc.perform(put("/subscriptions/payment-method")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonTester.write(request).getJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pixQrCodeBase64").value("base64"));
+    }
+
+    @Test
+    @DisplayName("GET /subscriptions/pix-qr-code -> Should return 200 OK with PIX data")
+    void shouldGetPixQrCode() throws Exception {
+        CheckoutResponseDTO mockResponse = new CheckoutResponseDTO("sub-123",
+                "base64", "copiacola");
+        when(subscriptionService.getPendingPixQrCode(any())).thenReturn(mockResponse);
+
+        mockMvc.perform(get("/subscriptions/pix-qr-code"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pixCopiaECola").value("copiacola"));
     }
 
     // ==================== PUT CHANGE PLAN TESTS ====================

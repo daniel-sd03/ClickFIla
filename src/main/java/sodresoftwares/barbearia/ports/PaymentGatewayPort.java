@@ -61,6 +61,17 @@ public interface PaymentGatewayPort {
     CheckoutResponseDTO processPixCheckout(Business business, Plan plan, String gatewayCustomerId);
 
     /**
+     * Retrieves the PIX QR Code for an already existing pending subscription.
+     * Used to recover the payment info without generating a duplicate subscription in the gateway.
+     */
+    CheckoutResponseDTO getPendingPixQrCode(String gatewaySubscriptionId);
+
+    /**
+     * Retrieves the PIX QR Code directly from a specific gateway invoice ID.
+     */
+    CheckoutResponseDTO getPixQrCodeByInvoiceId(String gatewayInvoiceId);
+
+    /**
      * Cancels the active subscription in the Gateway.
      */
     void cancelSubscription(String gatewaySubscriptionId);

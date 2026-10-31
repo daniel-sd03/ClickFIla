@@ -169,7 +169,6 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public CheckoutResponseDTO processPixCheckout(Business business, Plan plan, String gatewayCustomerId) {
         String cycle = plan.getBillingCycle().name();
 
@@ -198,7 +197,54 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
         }
 
         String subscriptionId = (String) subscriptionResponse.get("id");
+        return fetchPixQrCodeFromSubscription(subscriptionId);
+    }
 
+    @Override
+    public CheckoutResponseDTO getPendingPixQrCode(String gatewaySubscriptionId) {
+        return fetchPixQrCodeFromSubscription(gatewaySubscriptionId);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public CheckoutResponseDTO getPixQrCodeByInvoiceId(String gatewayInvoiceId) {
+        var pixResponse = restClient.get()
+                .uri("/payments/{id}/pixQrCode", gatewayInvoiceId)
+                .retrieve()
+                .body(Map.class);
+
+        if (pixResponse == null || !pixResponse.containsKey("payload")) {
+            throw new AppException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "GATEWAY_ERROR",
+                    "Failed to retrieve PIX QR Code."
+            );
+        }
+
+        return new CheckoutResponseDTO(
+                null,
+                (String) pixResponse.get("encodedImage"),
+                (String) pixResponse.get("payload")
+        );
+    }
+
+    @Override
+    public void cancelSubscription(String gatewaySubscriptionId) {
+        restClient.delete()
+                .uri("/subscriptions/{id}", gatewaySubscriptionId)
+                .retrieve()
+                .toBodilessEntity();
+    }
+
+    // ======================================================================================
+    // Auxiliary Methods
+    // ======================================================================================
+
+    /**
+     * Helper method to fetch the first payment of a subscription and retrieve its PIX QR Code.
+     */
+    @SuppressWarnings("unchecked")
+    private CheckoutResponseDTO fetchPixQrCodeFromSubscription(String subscriptionId) {
         var paymentsResponse = restClient.get()
                 .uri("/payments?subscription=" + subscriptionId)
                 .retrieve()
@@ -209,7 +255,7 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
             throw new AppException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
                     "GATEWAY_ERROR",
-                    "No invoice generated for this PIX subscription."
+                    "No invoice found for this PIX subscription."
             );
         }
 
@@ -234,18 +280,6 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
                 (String) pixResponse.get("payload")
         );
     }
-
-    @Override
-    public void cancelSubscription(String gatewaySubscriptionId) {
-        restClient.delete()
-                .uri("/subscriptions/{id}", gatewaySubscriptionId)
-                .retrieve()
-                .toBodilessEntity();
-    }
-
-    // ======================================================================================
-    // Auxiliary Methods
-    // ======================================================================================
 
     /**
      * Reusable method to send the request (POST/PUT) and parse the GatewayCreditCardResponse.

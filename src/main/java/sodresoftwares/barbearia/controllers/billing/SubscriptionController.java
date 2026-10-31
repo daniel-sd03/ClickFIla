@@ -34,12 +34,14 @@ public class SubscriptionController {
     }
 
     @PutMapping("/payment-method")
-    public ResponseEntity<Void> updatePaymentMethod(
+    public ResponseEntity<CheckoutResponseDTO> updatePaymentMethod(
             @AuthenticationPrincipal User loggedInUser,
             @RequestBody @Valid CheckoutRequestDTO request) {
-
-        subscriptionService.updatePaymentMethod(loggedInUser.getId(), request);
-        return ResponseEntity.ok().build();
+        CheckoutResponseDTO response = subscriptionService.updatePaymentMethod(loggedInUser.getId(), request);
+        if (response != null) {
+            return ResponseEntity.ok(response);
+        }
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/cancel/{businessId}")
@@ -56,6 +58,16 @@ public class SubscriptionController {
 
         subscriptionService.changePlan(loggedInUser.getId(), request);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/pix-qr-code")
+    public ResponseEntity<CheckoutResponseDTO> getPendingPixQrCode(
+            @AuthenticationPrincipal User loggedInUser) {
+        CheckoutResponseDTO response = subscriptionService.getPendingPixQrCode(loggedInUser.getId());
+        if (response == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/me")
