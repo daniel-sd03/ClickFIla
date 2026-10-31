@@ -15,6 +15,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import sodresoftwares.barbearia.dto.billing.CheckoutResponseDTO;
 import sodresoftwares.barbearia.dto.billing.CreditCardDTO;
 import sodresoftwares.barbearia.dto.billing.CreditCardHolderDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
@@ -283,6 +284,29 @@ class AsaasPaymentAdapterTest {
 
         assertThat(response).isNotNull();
         assertThat(response.gatewaySubscriptionId()).isEqualTo("sub_pix123");
+        assertThat(response.pixQrCodeBase64()).isEqualTo("base64_image_data");
+        assertThat(response.pixCopiaECola()).isEqualTo("pix_copy_paste_data");
+    }
+
+    // ==================== PIX CHECKOUT BY INVOICE TESTS ====================
+
+    @Test
+    @DisplayName("Should fetch PIX QR Code by Invoice ID successfully")
+    void shouldFetchPixQrCodeByInvoiceId() {
+        String qrCodeJsonResponse = """
+                {
+                    "encodedImage": "base64_image_data",
+                    "payload": "pix_copy_paste_data"
+                }
+                """;
+
+        mockServer.expect(requestTo(API_URL + "/payments/inv_123/pixQrCode"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(qrCodeJsonResponse, MediaType.APPLICATION_JSON));
+
+        CheckoutResponseDTO response = adapter.getPixQrCodeByInvoiceId("inv_123");
+
+        assertThat(response).isNotNull();
         assertThat(response.pixQrCodeBase64()).isEqualTo("base64_image_data");
         assertThat(response.pixCopiaECola()).isEqualTo("pix_copy_paste_data");
     }

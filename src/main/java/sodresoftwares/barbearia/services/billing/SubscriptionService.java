@@ -12,6 +12,7 @@ import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.billing.*;
 import sodresoftwares.barbearia.ports.PaymentGatewayPort;
 import sodresoftwares.barbearia.repositories.billing.BusinessPaymentMethodRepository;
+import sodresoftwares.barbearia.repositories.billing.PaymentRepository;
 import sodresoftwares.barbearia.repositories.billing.PlanRepository;
 import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;
 
@@ -28,6 +29,7 @@ public class SubscriptionService {
     private final PlanRepository planRepository;
     private final PaymentGatewayPort paymentGatewayPort;
     private final BusinessPaymentMethodRepository paymentMethodRepository;
+    private final PaymentRepository paymentRepository;
 
     @Value("${billing.trial.days}")
     private int trialDays;
@@ -55,50 +57,25 @@ public class SubscriptionService {
     public CheckoutResponseDTO processTransparentCheckout(String userId, CheckoutRequestDTO request) {
         Subscription subscription = getSubscriptionByUser(userId);
 
-        if (subscription.getStatus() == SubscriptionStatus.ACTIVE && subscription.getGatewaySubscriptionId() != null) {
+        if (subscription.getGatewaySubscriptionId() != null && subscription.getStatus() != SubscriptionStatus.CANCELED) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
-                    "ALREADY_ACTIVE",
-                    "You already have an active subscription."
+                    "SUBSCRIPTION_ALREADY_EXISTS",
+                    "You already have an ongoing or active subscription. Use the payment method update endpoint."
             );
         }
 
         Business business = subscription.getBusiness();
         Plan plan = getPlanByCode(request.planId());
         String customerId = paymentGatewayPort.createOrUpdateCustomer(business);
-        subscription.setGatewayCustomerId(customerId);
-        LocalDate today = LocalDate.now(ZoneId.of("America/Sao_Paulo"));
 
-        subscription.setStatus(SubscriptionStatus.PENDING);
-        subscription.setCurrentPeriodStart(today);
-        subscription.setBillingAnchorDay(today.getDayOfMonth());
+        subscription.setGatewayCustomerId(customerId);
         subscription.setCancelAtPeriodEnd(false);
 
         if (request.paymentMethod() == PaymentMethod.CREDIT_CARD) {
-            var checkoutResponse = paymentGatewayPort.processCreditCardCheckout(
-                    business, plan, customerId, request.creditCard(), request.creditCardHolderInfo()
-            );
-
-            BusinessPaymentMethod paymentMethod = getOrCreatePaymentMethod(business);
-            paymentMethod.setCardBrand(checkoutResponse.cardBrand());
-            paymentMethod.setLastFourDigits(checkoutResponse.lastFourDigits());
-            paymentMethod.setCreditCardToken(checkoutResponse.creditCardToken());
-            paymentMethodRepository.save(paymentMethod);
-
-            subscription.setGatewaySubscriptionId(checkoutResponse.gatewaySubscriptionId());
-            subscriptionRepository.save(subscription);
-
-            log.info("Credit Card checkout processed for business {}. Waiting for webhook confirmation.", business.getId());
-            return null;
-
+            return handleCreditCardCheckout(subscription, business, plan, customerId, request);
         } else if (request.paymentMethod() == PaymentMethod.PIX) {
-            var pixResponse = paymentGatewayPort.processPixCheckout(business, plan, customerId);
-
-            subscription.setGatewaySubscriptionId(pixResponse.gatewaySubscriptionId());
-            subscriptionRepository.save(subscription);
-
-            log.info("PIX checkout processed for business {}. Waiting for payment.", business.getId());
-            return pixResponse;
+            return handlePixCheckout(subscription, business, plan, customerId);
         } else {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
@@ -109,7 +86,7 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public void updatePaymentMethod(String userId, CheckoutRequestDTO request) {
+    public CheckoutResponseDTO updatePaymentMethod(String userId, CheckoutRequestDTO request) {
         Subscription subscription = getSubscriptionByUser(userId);
         requireGatewaySubscriptionId(subscription);
 
@@ -124,7 +101,10 @@ public class SubscriptionService {
             paymentMethodRepository.findByBusinessId(subscription.getBusiness().getId())
                     .ifPresent(paymentMethodRepository::delete);
 
+            CheckoutResponseDTO pixResponse = paymentGatewayPort.getPendingPixQrCode(subscription.getGatewaySubscriptionId());
+
             log.info("Payment method updated to PIX for business {}.", subscription.getBusiness().getId());
+            return pixResponse;
 
         } else if (request.paymentMethod() == PaymentMethod.CREDIT_CARD) {
             var gatewayResponse = paymentGatewayPort.updateSubscriptionPaymentMethod(
@@ -141,8 +121,13 @@ public class SubscriptionService {
             paymentMethodRepository.save(paymentMethod);
 
             log.info("Credit card updated successfully for business {}.", subscription.getBusiness().getId());
+            return null;
         } else {
-            throw new AppException(HttpStatus.BAD_REQUEST, "INVALID_PAYMENT_METHOD", "Supported methods are CREDIT_CARD or PIX.");
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_PAYMENT_METHOD",
+                    "Supported methods are CREDIT_CARD or PIX."
+            );
         }
     }
 
@@ -207,6 +192,21 @@ public class SubscriptionService {
                 subscription.getBusiness().getId(), newPlan.getCode(), subscription.getCurrentPeriodEnd());
     }
 
+    public CheckoutResponseDTO getPendingPixQrCode(String userId) {
+        Subscription subscription = getSubscriptionByUser(userId);
+
+        return paymentRepository.findFirstBySubscriptionIdAndStatusOrderByIdDesc(
+                        subscription.getId(), PaymentStatus.PENDING
+                )
+                .filter(payment -> payment.getPixCopyPaste() != null)
+                .map(payment -> new CheckoutResponseDTO(
+                        subscription.getGatewaySubscriptionId(),
+                        payment.getPixQrCodeBase64(),
+                        payment.getPixCopyPaste()
+                ))
+                .orElse(null);
+    }
+
     @Transactional
     public void cancelSubscription(String businessId) {
         Subscription subscription = getSubscriptionByBusiness(businessId);
@@ -252,6 +252,40 @@ public class SubscriptionService {
     // ==========================================
     // AUXILIARY METHODS & DATA FETCHING
     // ==========================================
+
+    private CheckoutResponseDTO handleCreditCardCheckout(
+            Subscription subscription, Business business, Plan plan, String customerId, CheckoutRequestDTO request) {
+
+        var checkoutResponse = paymentGatewayPort.processCreditCardCheckout(
+                business, plan, customerId, request.creditCard(), request.creditCardHolderInfo()
+        );
+
+        BusinessPaymentMethod paymentMethod = getOrCreatePaymentMethod(business);
+        paymentMethod.setCardBrand(checkoutResponse.cardBrand());
+        paymentMethod.setLastFourDigits(checkoutResponse.lastFourDigits());
+        paymentMethod.setCreditCardToken(checkoutResponse.creditCardToken());
+        paymentMethodRepository.save(paymentMethod);
+
+        subscription.setStatus(SubscriptionStatus.PENDING);
+        subscription.setGatewaySubscriptionId(checkoutResponse.gatewaySubscriptionId());
+        subscriptionRepository.save(subscription);
+
+        log.info("Credit Card checkout processed for business {}. Waiting for webhook confirmation.", business.getId());
+        return null;
+    }
+
+    private CheckoutResponseDTO handlePixCheckout(
+            Subscription subscription, Business business, Plan plan, String customerId) {
+
+        var pixResponse = paymentGatewayPort.processPixCheckout(business, plan, customerId);
+
+        subscription.setStatus(SubscriptionStatus.PENDING);
+        subscription.setGatewaySubscriptionId(pixResponse.gatewaySubscriptionId());
+        subscriptionRepository.save(subscription);
+
+        log.info("PIX checkout processed for business {}. Waiting for webhook and payment.", business.getId());
+        return pixResponse;
+    }
 
     private Subscription getSubscriptionByUser(String userId) {
         return subscriptionRepository.findByUserIdWithBusinessAndPlan(userId)
