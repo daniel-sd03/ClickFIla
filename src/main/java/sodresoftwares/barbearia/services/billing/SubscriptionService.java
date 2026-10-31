@@ -18,6 +18,7 @@ import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -240,12 +241,18 @@ public class SubscriptionService {
                 .map(method -> new CreditCardSummaryDTO(method.getCardBrand(), method.getLastFourDigits()))
                 .orElse(null);
 
+        boolean hasPending = paymentRepository.existsBySubscriptionIdAndStatusIn(
+                subscription.getId(),
+                List.of(PaymentStatus.PENDING, PaymentStatus.OVERDUE)
+        );
+
         return new SubscriptionResponseDTO(
                 subscription.getStatus(),
                 planDto,
                 subscription.getCurrentPeriodEnd(),
                 subscription.getCancelAtPeriodEnd(),
-                cardDto
+                cardDto,
+                hasPending
         );
     }
 

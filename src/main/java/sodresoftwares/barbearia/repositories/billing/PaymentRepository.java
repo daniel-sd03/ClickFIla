@@ -19,6 +19,7 @@ public interface PaymentRepository extends JpaRepository<Payment, String> {
             "DESC LIMIT 1")
     Optional<Payment> findLatestPendingOrOverduePayment(String subscriptionId);
 
+    boolean existsBySubscriptionIdAndStatusIn(String subscriptionId, List<PaymentStatus> statuses);
     Optional<Payment> findFirstBySubscriptionIdAndStatusOrderByIdDesc(String subscriptionId, PaymentStatus status);
     boolean existsByGatewayInvoiceId(String gatewayInvoiceId);
     Optional<Payment> findByGatewayInvoiceId(String gatewayInvoiceId);
