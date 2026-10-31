@@ -80,8 +80,6 @@ public class PaymentWebhookService {
 
         if (event.equals("SUBSCRIPTION_DELETED")) {
             subscriptionRepository.findByBusinessId(businessId).ifPresent(subscription -> {
-                // Só cancela se o ID deletado no Asaas for realmente a assinatura atual do banco
-                // (Evita cancelar a assinatura quando o usuário faz upgrade/downgrade no changePlan)
                 if (gatewaySubId != null && !gatewaySubId.equals(subscription.getGatewaySubscriptionId())) {
                     log.info("Ignoring SUBSCRIPTION_DELETED for old subscription {} of business {}", gatewaySubId, businessId);
                     return;
