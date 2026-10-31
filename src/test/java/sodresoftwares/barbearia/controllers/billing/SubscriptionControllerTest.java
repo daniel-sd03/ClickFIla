@@ -242,7 +242,8 @@ class SubscriptionControllerTest {
                 LocalDate.now().plusDays(30),
                 false,
                 cardDto,
-                false
+                false,
+                PaymentMethod.CREDIT_CARD
         );
 
         when(subscriptionService.getMySubscriptionDetails(nullable(String.class)))

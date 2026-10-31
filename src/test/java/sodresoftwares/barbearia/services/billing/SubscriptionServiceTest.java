@@ -471,6 +471,8 @@ class SubscriptionServiceTest {
     @DisplayName("Should get subscription details and calculate pending payments with date threshold")
     void testGetMySubscriptionDetails_Success() {
         // Arrange
+        testSubscription.setPaymentMethod(PaymentMethod.CREDIT_CARD); // 🔥 Mocka a forma ativa
+
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
 
         BusinessPaymentMethod existingCard = BusinessPaymentMethod.builder()
@@ -479,7 +481,6 @@ class SubscriptionServiceTest {
                 .build();
         when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.of(existingCard));
 
-        // Mocka
         when(paymentRepository.existsBySubscriptionIdAndStatusInAndDueDateBeforeOrEqual(
                 eq(testSubscription.getId()),
                 eq(List.of(PaymentStatus.PENDING, PaymentStatus.OVERDUE)),
@@ -496,6 +497,8 @@ class SubscriptionServiceTest {
         assertThat(result.creditCard().brand()).isEqualTo("MASTERCARD");
         assertThat(result.creditCard().lastFourDigits()).isEqualTo("9999");
         assertThat(result.hasPendingPayment()).isTrue();
+
+        assertThat(result.activePaymentMethod()).isEqualTo(PaymentMethod.CREDIT_CARD);
 
         verify(paymentRepository).existsBySubscriptionIdAndStatusInAndDueDateBeforeOrEqual(
                 eq(testSubscription.getId()),

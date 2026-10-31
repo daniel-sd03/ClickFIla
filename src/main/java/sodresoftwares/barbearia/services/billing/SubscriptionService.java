@@ -102,6 +102,9 @@
                 paymentMethodRepository.findByBusinessId(subscription.getBusiness().getId())
                         .ifPresent(paymentMethodRepository::delete);
 
+                subscription.setPaymentMethod(PaymentMethod.PIX);
+                subscriptionRepository.save(subscription);
+
                 CheckoutResponseDTO pixResponse = paymentGatewayPort.getPendingPixQrCode(subscription.getGatewaySubscriptionId());
 
                 log.info("Payment method updated to PIX for business {}.", subscription.getBusiness().getId());
@@ -120,6 +123,9 @@
                 paymentMethod.setLastFourDigits(gatewayResponse.lastFourDigits());
                 paymentMethod.setCreditCardToken(gatewayResponse.creditCardToken());
                 paymentMethodRepository.save(paymentMethod);
+
+                subscription.setPaymentMethod(PaymentMethod.CREDIT_CARD);
+                subscriptionRepository.save(subscription);
 
                 log.info("Credit card updated successfully for business {}.", subscription.getBusiness().getId());
                 return null;
@@ -186,6 +192,7 @@
                         .ifPresent(paymentMethodRepository::delete);
             }
 
+            subscription.setPaymentMethod(request.paymentMethod());
             subscription.setGatewaySubscriptionId(gatewayResponse.gatewaySubscriptionId());
             subscriptionRepository.save(subscription);
 
@@ -255,7 +262,8 @@
                     subscription.getCurrentPeriodEnd(),
                     subscription.getCancelAtPeriodEnd(),
                     cardDto,
-                    hasPending
+                    hasPending,
+                    subscription.getPaymentMethod()
             );
         }
 
@@ -302,6 +310,7 @@
             paymentMethod.setCreditCardToken(gatewayResponse.creditCardToken());
             paymentMethodRepository.save(paymentMethod);
 
+            subscription.setPaymentMethod(PaymentMethod.CREDIT_CARD);
             subscription.setPlan(plan);
             subscription.setGatewaySubscriptionId(gatewayResponse.gatewaySubscriptionId());
             subscription.setCancelAtPeriodEnd(false);
@@ -312,8 +321,7 @@
             return null;
         }
 
-        private CheckoutResponseDTO handlePixCheckout(
-                Subscription subscription, Business business, Plan plan, String customerId) {
+        private CheckoutResponseDTO handlePixCheckout(Subscription subscription, Business business, Plan plan, String customerId) {
 
             boolean hasValidDays = subscription.getCurrentPeriodEnd() != null
                     && !subscription.getCurrentPeriodEnd().isBefore(LocalDate.now(ZoneId.of("America/Sao_Paulo")));
@@ -341,6 +349,7 @@
                 subscription.setStatus(SubscriptionStatus.PENDING);
             }
 
+            subscription.setPaymentMethod(PaymentMethod.PIX);
             subscription.setPlan(plan);
             subscription.setGatewaySubscriptionId(pixResponse.gatewaySubscriptionId());
             subscription.setCancelAtPeriodEnd(false);

@@ -58,6 +58,10 @@ public class Subscription {
     @Column(name = "current_period_end", nullable = false)
     private LocalDate currentPeriodEnd;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method")
+    private PaymentMethod paymentMethod;
+
     @Builder.Default
     @Column(name = "cancel_at_period_end", nullable = false)
     private Boolean cancelAtPeriodEnd = false;
