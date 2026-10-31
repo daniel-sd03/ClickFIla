@@ -14,10 +14,13 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import sodresoftwares.barbearia.model.billing.Subscription;
 import sodresoftwares.barbearia.model.billing.SubscriptionStatus;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,7 +61,6 @@ class SubscriptionCheckInterceptorTest {
 
     @AfterEach
     void tearDown() {
-        // Clear the security context after each test to prevent state leakage to other tests
         SecurityContextHolder.clearContext();
     }
 
@@ -67,64 +69,52 @@ class SubscriptionCheckInterceptorTest {
     @Test
     @DisplayName("Should allow request when authentication is null")
     void shouldAllowWhenAuthenticationIsNull() throws Exception {
-        // Arrange
         when(securityContext.getAuthentication()).thenReturn(null);
         SecurityContextHolder.setContext(securityContext);
 
-        // Act
         boolean result = interceptor.preHandle(request, response, new Object());
 
-        // Assert
         assertThat(result).isTrue();
-        verify(subscriptionRepository, never()).findSubscriptionStatusByUserId(any());
+        verify(subscriptionRepository, never()).findByUserIdWithBusinessAndPlan(any());
     }
 
     @Test
     @DisplayName("Should allow request when user is not authenticated")
     void shouldAllowWhenNotAuthenticated() throws Exception {
-        // Arrange
         when(securityContext.getAuthentication()).thenReturn(authentication);
         SecurityContextHolder.setContext(securityContext);
         when(authentication.isAuthenticated()).thenReturn(false);
 
-        // Act
         boolean result = interceptor.preHandle(request, response, new Object());
 
-        // Assert
         assertThat(result).isTrue();
     }
 
     @Test
     @DisplayName("Should allow request when principal is anonymousUser")
     void shouldAllowWhenAnonymousUser() throws Exception {
-        // Arrange
         when(securityContext.getAuthentication()).thenReturn(authentication);
         SecurityContextHolder.setContext(securityContext);
         when(authentication.isAuthenticated()).thenReturn(true);
         when(authentication.getPrincipal()).thenReturn("anonymousUser");
 
-        // Act
         boolean result = interceptor.preHandle(request, response, new Object());
 
-        // Assert
         assertThat(result).isTrue();
     }
 
     @Test
     @DisplayName("Should log error and allow request when principal is not a User object (Security Anomaly)")
     void shouldAllowAndLogWhenPrincipalIsNotUser() throws Exception {
-        // Arrange
         when(securityContext.getAuthentication()).thenReturn(authentication);
         SecurityContextHolder.setContext(securityContext);
         when(authentication.isAuthenticated()).thenReturn(true);
         when(authentication.getPrincipal()).thenReturn("SomeStringPrincipal");
 
-        // Act
         boolean result = interceptor.preHandle(request, response, new Object());
 
-        // Assert
         assertThat(result).isTrue();
-        verify(subscriptionRepository, never()).findSubscriptionStatusByUserId(any());
+        verify(subscriptionRepository, never()).findByUserIdWithBusinessAndPlan(any());
     }
 
     // ==================== SUBSCRIPTION VALIDATIONS ====================
@@ -132,93 +122,111 @@ class SubscriptionCheckInterceptorTest {
     @Test
     @DisplayName("Should allow request when subscription is ACTIVE")
     void shouldAllowWhenSubscriptionIsActive() throws Exception {
-        // Arrange
         setupAuthenticatedUser();
-        when(subscriptionRepository.findSubscriptionStatusByUserId(USER_ID))
-                .thenReturn(Optional.of(SubscriptionStatus.ACTIVE));
+        Subscription activeSub = createSubscription(SubscriptionStatus.ACTIVE, LocalDate.now().plusDays(10));
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(activeSub));
 
-        // Act
         boolean result = interceptor.preHandle(request, response, new Object());
 
-        // Assert
         assertThat(result).isTrue();
     }
 
     @Test
     @DisplayName("Should allow request when subscription is TRIAL")
     void shouldAllowWhenSubscriptionIsTrial() throws Exception {
-        // Arrange
         setupAuthenticatedUser();
-        when(subscriptionRepository.findSubscriptionStatusByUserId(USER_ID))
-                .thenReturn(Optional.of(SubscriptionStatus.TRIAL));
+        Subscription trialSub = createSubscription(SubscriptionStatus.TRIAL, LocalDate.now().plusDays(5));
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(trialSub));
 
-        // Act
         boolean result = interceptor.preHandle(request, response, new Object());
 
-        // Assert
         assertThat(result).isTrue();
     }
 
     @Test
     @DisplayName("Should allow request when subscription is not found (null status)")
     void shouldAllowWhenSubscriptionNotFound() throws Exception {
-        // Arrange
         setupAuthenticatedUser();
-        when(subscriptionRepository.findSubscriptionStatusByUserId(USER_ID))
-                .thenReturn(Optional.empty());
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.empty());
 
-        // Act
         boolean result = interceptor.preHandle(request, response, new Object());
 
-        // Assert
         assertThat(result).isTrue();
     }
 
     @Test
-    @DisplayName("Should block request with 402 PAYMENT_REQUIRED when subscription is SUSPENDED")
-    void shouldBlockWhenSubscriptionIsSuspended() throws Exception {
-        // Arrange
+    @DisplayName("Should allow request when subscription is CANCELED but still has valid days")
+    void shouldAllowWhenSubscriptionIsCanceledButHasValidDays() throws Exception {
         setupAuthenticatedUser();
-        when(subscriptionRepository.findSubscriptionStatusByUserId(USER_ID))
-                .thenReturn(Optional.of(SubscriptionStatus.SUSPENDED));
+        Subscription canceledSubValidDays = createSubscription(SubscriptionStatus.CANCELED,
+                LocalDate.now(ZoneId.of("America/Sao_Paulo")).plusDays(5));
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(canceledSubValidDays));
 
-        // Act
         boolean result = interceptor.preHandle(request, response, new Object());
 
-        // Assert
-        assertThat(result).isFalse();
-        assertThat(response.getStatus()).isEqualTo(HttpStatus.PAYMENT_REQUIRED.value());
-        assertThat(response.getContentType()).isEqualTo("application/json");
-
-        // Check the JSON written in the response
-        String jsonResponse = response.getContentAsString();
-        assertThat(jsonResponse).contains("PAYMENT_REQUIRED");
-        assertThat(jsonResponse).contains("Your subscription is suspended or canceled");
+        assertThat(result).isTrue();
     }
 
     @Test
-    @DisplayName("Should block request with 402 PAYMENT_REQUIRED when subscription is CANCELED")
-    void shouldBlockWhenSubscriptionIsCanceled() throws Exception {
-        // Arrange
+    @DisplayName("Should block request with 402 when subscription is CANCELED and valid days expired")
+    void shouldBlockWhenSubscriptionIsCanceledAndExpired() throws Exception {
         setupAuthenticatedUser();
-        when(subscriptionRepository.findSubscriptionStatusByUserId(USER_ID))
-                .thenReturn(Optional.of(SubscriptionStatus.CANCELED));
+        Subscription canceledSubExpired = createSubscription(SubscriptionStatus.CANCELED,
+                LocalDate.now(ZoneId.of("America/Sao_Paulo")).minusDays(1));
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(canceledSubExpired));
 
-        // Act
         boolean result = interceptor.preHandle(request, response, new Object());
 
-        // Assert
-        assertThat(result).isFalse();
-        assertThat(response.getStatus()).isEqualTo(HttpStatus.PAYMENT_REQUIRED.value());
-        assertThat(response.getContentType()).isEqualTo("application/json");
-        assertThat(response.getContentAsString()).contains("PAYMENT_REQUIRED");
+        assertBlockedResponse(result);
     }
 
-    // Utility method to avoid code repetition
+    @Test
+    @DisplayName("Should block request with 402 when subscription is SUSPENDED")
+    void shouldBlockWhenSubscriptionIsSuspended() throws Exception {
+        setupAuthenticatedUser();
+        Subscription suspendedSub = createSubscription(SubscriptionStatus.SUSPENDED, LocalDate.now());
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(suspendedSub));
+
+        boolean result = interceptor.preHandle(request, response, new Object());
+
+        assertBlockedResponse(result);
+    }
+
+    @Test
+    @DisplayName("Should block request with 402 when subscription is PENDING")
+    void shouldBlockWhenSubscriptionIsPending() throws Exception {
+        setupAuthenticatedUser();
+        Subscription pendingSub = createSubscription(SubscriptionStatus.PENDING, LocalDate.now().plusDays(30));
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(pendingSub));
+
+        boolean result = interceptor.preHandle(request, response, new Object());
+
+        assertBlockedResponse(result);
+    }
+
+    // ==================== UTILITY METHODS ====================
+
     private void setupAuthenticatedUser() {
         when(securityContext.getAuthentication()).thenReturn(authentication);
         SecurityContextHolder.setContext(securityContext);
         when(authentication.isAuthenticated()).thenReturn(true);
         when(authentication.getPrincipal()).thenReturn(testUser);
+    }
+
+    private Subscription createSubscription(SubscriptionStatus status, LocalDate periodEnd) {
+        return Subscription.builder()
+                .status(status)
+                .currentPeriodEnd(periodEnd)
+                .build();
+    }
+
+    private void assertBlockedResponse(boolean result) throws Exception {
+        assertThat(result).isFalse();
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.PAYMENT_REQUIRED.value());
+        assertThat(response.getContentType()).isEqualTo("application/json");
+
+        String jsonResponse = response.getContentAsString();
+        assertThat(jsonResponse).contains("PAYMENT_REQUIRED");
+        assertThat(jsonResponse).contains("Your subscription is inactive or pending payment.");
     }
 }

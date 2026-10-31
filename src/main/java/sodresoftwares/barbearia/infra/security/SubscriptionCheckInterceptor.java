@@ -9,9 +9,13 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
+import sodresoftwares.barbearia.model.billing.Subscription;
 import sodresoftwares.barbearia.model.billing.SubscriptionStatus;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.repositories.billing.SubscriptionRepository;
+
+import java.time.LocalDate;
+import java.time.ZoneId;
 
 @Slf4j
 @Component
@@ -36,18 +40,30 @@ public class SubscriptionCheckInterceptor implements HandlerInterceptor {
 
         String userId = authenticatedUser.getId();
 
+        Subscription subscription = subscriptionRepository.findByUserIdWithBusinessAndPlan(userId).orElse(null);
 
-        SubscriptionStatus status = subscriptionRepository.findSubscriptionStatusByUserId(userId).orElse(null);
+        if (subscription == null) {
+            return true;
+        }
 
-        if (status == SubscriptionStatus.SUSPENDED || status == SubscriptionStatus.CANCELED) {
-            log.warn("Access denied (402). Subscription is {}.", status);
+        SubscriptionStatus status = subscription.getStatus();
+        LocalDate periodEnd = subscription.getCurrentPeriodEnd();
+        LocalDate today = LocalDate.now(ZoneId.of("America/Sao_Paulo"));
+
+        boolean hasValidDays = periodEnd != null && !periodEnd.isBefore(today);
+
+        if (status == SubscriptionStatus.SUSPENDED
+                || status == SubscriptionStatus.PENDING
+                || (status == SubscriptionStatus.CANCELED && !hasValidDays)) {
+
+            log.warn("Access denied (402) for User {}. Subscription is {}. Valid days remaining: {}", userId, status, hasValidDays);
 
             response.setStatus(HttpStatus.PAYMENT_REQUIRED.value());
             response.setContentType("application/json");
             response.getWriter().write("""
                 {
                     "error": "PAYMENT_REQUIRED", 
-                    "message": "Your subscription is suspended or canceled. Please settle your payment to access the business features."
+                    "message": "Your subscription is inactive or pending payment. Please settle your payment to access the business features."
                 }
             """);
             return false;
