@@ -25,6 +25,7 @@ import sodresoftwares.barbearia.infra.security.SecurityFilter;
 import sodresoftwares.barbearia.infra.security.SubscriptionCheckInterceptor;
 import sodresoftwares.barbearia.infra.security.WebMvcConfig;
 import sodresoftwares.barbearia.model.billing.BillingCycle;
+import sodresoftwares.barbearia.model.billing.PaymentMethod; // 👈 IMPORT ADICIONADO
 import sodresoftwares.barbearia.model.billing.SubscriptionStatus;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.model.user.UserRole;
@@ -110,7 +111,7 @@ class SubscriptionControllerTest {
                 "30123456", "100", null, "31999999999", null
         );
 
-        CheckoutRequest request = new CheckoutRequest("PRO_MONTHLY", "CREDIT_CARD",
+        CheckoutRequestDTO request = new CheckoutRequestDTO("PRO_MONTHLY", PaymentMethod.CREDIT_CARD,
                 creditCard, holderInfo);
 
         mockMvc.perform(post("/subscriptions/checkout")
@@ -119,20 +120,20 @@ class SubscriptionControllerTest {
                 .andExpect(status().isNoContent());
     }
 
-    // ==================== PUT UPDATE CREDIT CARD TESTS ====================
+    // ==================== PUT UPDATE PAYMENT METHOD TESTS ====================
 
     @Test
-    @DisplayName("PUT /subscriptions/credit-card -> Should update credit card successfully")
-    void shouldUpdateCreditCard() throws Exception {
+    @DisplayName("PUT /subscriptions/payment-method -> Should update payment method successfully")
+    void shouldUpdatePaymentMethod() throws Exception {
         CreditCardDTO creditCard = new CreditCardDTO("João F", "4111111111111111",
                 "12", "2028", "123");
         CreditCardHolderDTO holderInfo = new CreditCardHolderDTO("João F", "test@test.com",
                 "12345678909", "30123456", "100", null, "31999999999", null);
 
-        CheckoutRequest request = new CheckoutRequest("PRO_MONTHLY", "CREDIT_CARD",
+        CheckoutRequestDTO request = new CheckoutRequestDTO("PRO_MONTHLY", PaymentMethod.CREDIT_CARD,
                 creditCard, holderInfo);
 
-        mockMvc.perform(put("/subscriptions/credit-card")
+        mockMvc.perform(put("/subscriptions/payment-method")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonTester.write(request).getJson()))
                 .andExpect(status().isOk());
@@ -143,7 +144,7 @@ class SubscriptionControllerTest {
     @Test
     @DisplayName("PUT /subscriptions/plan -> Should change plan successfully")
     void shouldChangePlan() throws Exception {
-        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", null, null);
+        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", PaymentMethod.CREDIT_CARD, null, null);
 
         mockMvc.perform(put("/subscriptions/plan")
                         .contentType(MediaType.APPLICATION_JSON)

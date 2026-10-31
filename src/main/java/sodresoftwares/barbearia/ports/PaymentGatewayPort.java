@@ -1,6 +1,7 @@
 package sodresoftwares.barbearia.ports;
 
 import sodresoftwares.barbearia.dto.billing.CheckoutResponseDTO;
+import sodresoftwares.barbearia.model.billing.PaymentMethod;
 import sodresoftwares.barbearia.model.business.Business;
 import sodresoftwares.barbearia.model.billing.Plan;
 import sodresoftwares.barbearia.dto.billing.CreditCardDTO;
@@ -31,8 +32,9 @@ public interface PaymentGatewayPort {
     /**
      * Updates the credit card on an active subscription in the Gateway.
      */
-    GatewayCreditCardResponse updateSubscriptionCreditCard(
+    GatewayCreditCardResponse updateSubscriptionPaymentMethod(
             String gatewaySubscriptionId,
+            PaymentMethod paymentMethod,
             CreditCardDTO creditCard,
             CreditCardHolderDTO holderInfo
     );
@@ -45,6 +47,7 @@ public interface PaymentGatewayPort {
             Business business,
             Plan plan,
             String gatewayCustomerId,
+            PaymentMethod paymentMethod,
             String creditCardToken,
             CreditCardDTO creditCard,
             CreditCardHolderDTO holderInfo,

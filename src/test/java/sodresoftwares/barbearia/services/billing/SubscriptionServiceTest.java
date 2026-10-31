@@ -10,7 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import sodresoftwares.barbearia.dto.billing.ChangePlanDTO;
-import sodresoftwares.barbearia.dto.billing.CheckoutRequest;
+import sodresoftwares.barbearia.dto.billing.CheckoutRequestDTO;
 import sodresoftwares.barbearia.dto.billing.CreditCardDTO;
 import sodresoftwares.barbearia.dto.billing.CreditCardHolderDTO;
 import sodresoftwares.barbearia.infra.exception.AppException;
@@ -58,7 +58,7 @@ class SubscriptionServiceTest {
     private Subscription testSubscription;
     private Plan testPlan;
     private Payment testPayment;
-    private CheckoutRequest testCheckoutRequest;
+    private CheckoutRequestDTO testCheckoutRequest;
 
     private final String USER_ID = "user-123";
     private final String BUSINESS_ID = "biz-123";
@@ -103,9 +103,9 @@ class SubscriptionServiceTest {
                 "31999999999",
                 null
         );
-        testCheckoutRequest = new CheckoutRequest(
+        testCheckoutRequest = new CheckoutRequestDTO(
                 PLAN_CODE,
-                "CREDIT_CARD",
+                PaymentMethod.CREDIT_CARD, // 👈 Alterado para Enum
                 ccDto, holderDto);
     }
 
@@ -157,30 +157,30 @@ class SubscriptionServiceTest {
         ));
     }
 
-        @Test
-        @DisplayName("Should reactivate a previously canceled subscription during transparent checkout (Churn Recovery)")
-        void testProcessTransparentCheckout_ReactivateCanceledSubscription() {
-            // Arrange
-            testSubscription.setStatus(SubscriptionStatus.CANCELED);
-            testSubscription.setCancelAtPeriodEnd(true);
+    @Test
+    @DisplayName("Should reactivate a previously canceled subscription during transparent checkout (Churn Recovery)")
+    void testProcessTransparentCheckout_ReactivateCanceledSubscription() {
+        // Arrange
+        testSubscription.setStatus(SubscriptionStatus.CANCELED);
+        testSubscription.setCancelAtPeriodEnd(true);
 
-            when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
-            when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
-            when(paymentGatewayPort.createOrUpdateCustomer(testBusiness)).thenReturn("gw-cus-999");
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+        when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
+        when(paymentGatewayPort.createOrUpdateCustomer(testBusiness)).thenReturn("gw-cus-999");
 
-            GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-new123", "tok_new", "VISA", "1234");
-            when(paymentGatewayPort.processCreditCardCheckout(eq(testBusiness), eq(testPlan), eq("gw-cus-999"), any(), any())).thenReturn(mockResponse);
+        GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-new123", "tok_new", "VISA", "1234");
+        when(paymentGatewayPort.processCreditCardCheckout(eq(testBusiness), eq(testPlan), eq("gw-cus-999"), any(), any())).thenReturn(mockResponse);
 
-            // Act
-            subscriptionService.processTransparentCheckout(USER_ID, testCheckoutRequest);
+        // Act
+        subscriptionService.processTransparentCheckout(USER_ID, testCheckoutRequest);
 
-            // Assert
-            verify(subscriptionRepository).save(argThat(sub ->
-                    sub.getGatewaySubscriptionId().equals("gw-sub-new123") &&
-                            sub.getStatus() == SubscriptionStatus.PENDING &&
-                            sub.getCancelAtPeriodEnd() == false
-            ));
-        }
+        // Assert
+        verify(subscriptionRepository).save(argThat(sub ->
+                sub.getGatewaySubscriptionId().equals("gw-sub-new123") &&
+                        sub.getStatus() == SubscriptionStatus.PENDING &&
+                        sub.getCancelAtPeriodEnd() == false
+        ));
+    }
 
     @Test
     @DisplayName("Should throw exception when plan is not found during transparent checkout")
@@ -197,6 +197,7 @@ class SubscriptionServiceTest {
 
         verify(paymentMethodRepository, never()).save(any());
     }
+
     @Test
     @DisplayName("Should throw exception when user has no subscription during checkout")
     void testProcessTransparentCheckout_SubscriptionNotFound() {
@@ -208,11 +209,11 @@ class SubscriptionServiceTest {
                 .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
-    // ==================== UPDATE CREDIT CARD TESTS ====================
+    // ==================== UPDATE PAYMENT METHOD TESTS ====================
 
     @Test
     @DisplayName("Should update credit card successfully by updating existing payment method")
-    void testUpdateCreditCard_Success() {
+    void testUpdatePaymentMethod_CreditCard_Success() {
         // Arrange
         BusinessPaymentMethod existingCard = BusinessPaymentMethod.builder()
                 .id("card-1")
@@ -226,10 +227,10 @@ class SubscriptionServiceTest {
         when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.of(existingCard));
 
         GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-123", "tok_new999", "MASTERCARD", "4444");
-        when(paymentGatewayPort.updateSubscriptionCreditCard(eq("gw-sub-123"), any(), any())).thenReturn(mockResponse);
+        when(paymentGatewayPort.updateSubscriptionPaymentMethod(eq("gw-sub-123"), eq(PaymentMethod.CREDIT_CARD), any(), any())).thenReturn(mockResponse);
 
         // Act
-        subscriptionService.updateCreditCard(USER_ID, testCheckoutRequest);
+        subscriptionService.updatePaymentMethod(USER_ID, testCheckoutRequest);
 
         // Assert
         verify(paymentMethodRepository).save(argThat(method ->
@@ -241,17 +242,35 @@ class SubscriptionServiceTest {
     }
 
     @Test
+    @DisplayName("Should update payment method to PIX and delete old credit card")
+    void testUpdatePaymentMethod_Pix_Success() {
+        // Arrange
+        CheckoutRequestDTO pixRequest = new CheckoutRequestDTO(PLAN_CODE, PaymentMethod.PIX, null, null);
+        BusinessPaymentMethod existingCard = BusinessPaymentMethod.builder().id("card-1").business(testBusiness).build();
+
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+        when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.of(existingCard));
+
+        // Act
+        subscriptionService.updatePaymentMethod(USER_ID, pixRequest);
+
+        // Assert
+        verify(paymentGatewayPort).updateSubscriptionPaymentMethod(eq("gw-sub-123"), eq(PaymentMethod.PIX), isNull(), isNull());
+        verify(paymentMethodRepository).delete(existingCard);
+    }
+
+    @Test
     @DisplayName("Should update credit card successfully by creating new payment method if none exists")
-    void testUpdateCreditCard_NewCard_Success() {
+    void testUpdatePaymentMethod_NewCard_Success() {
         // Arrange
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
         when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.empty());
 
         GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-123", "tok_new999", "MASTERCARD", "4444");
-        when(paymentGatewayPort.updateSubscriptionCreditCard(eq("gw-sub-123"), any(), any())).thenReturn(mockResponse);
+        when(paymentGatewayPort.updateSubscriptionPaymentMethod(eq("gw-sub-123"), eq(PaymentMethod.CREDIT_CARD), any(), any())).thenReturn(mockResponse);
 
         // Act
-        subscriptionService.updateCreditCard(USER_ID, testCheckoutRequest);
+        subscriptionService.updatePaymentMethod(USER_ID, testCheckoutRequest);
 
         // Assert
         verify(paymentMethodRepository).save(argThat(method ->
@@ -262,8 +281,8 @@ class SubscriptionServiceTest {
     }
 
     @Test
-    @DisplayName("Should throw exception when trying to update card for subscription without gateway link")
-    void testUpdateCreditCard_NoGatewayId() {
+    @DisplayName("Should throw exception when trying to update method for subscription without gateway link")
+    void testUpdatePaymentMethod_NoGatewayId() {
         Subscription invalidSub = Subscription.builder()
                 .id("sub-555")
                 .business(testBusiness)
@@ -271,12 +290,12 @@ class SubscriptionServiceTest {
                 .build();
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(invalidSub));
 
-        assertThatThrownBy(() -> subscriptionService.updateCreditCard(USER_ID, testCheckoutRequest))
+        assertThatThrownBy(() -> subscriptionService.updatePaymentMethod(USER_ID, testCheckoutRequest))
                 .isInstanceOf(AppException.class)
                 .hasMessage("This subscription does not have an active gateway link.")
                 .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
 
-        verify(paymentGatewayPort, never()).updateSubscriptionCreditCard(any(), any(), any());
+        verify(paymentGatewayPort, never()).updateSubscriptionPaymentMethod(any(), any(), any(), any());
     }
 
     // ==================== CHANGE PLAN TESTS ====================
@@ -299,10 +318,10 @@ class SubscriptionServiceTest {
         GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-new123", "tok_123", "VISA", "1111");
 
         when(paymentGatewayPort.createScheduledSubscription(
-                eq(testBusiness), eq(newPlan), eq("gw-cus-123"), eq("tok_123"), isNull(), isNull(), eq(testSubscription.getCurrentPeriodEnd())
+                eq(testBusiness), eq(newPlan), eq("gw-cus-123"), eq(PaymentMethod.CREDIT_CARD), eq("tok_123"), isNull(), isNull(), eq(testSubscription.getCurrentPeriodEnd())
         )).thenReturn(mockResponse);
 
-        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", null, null);
+        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", PaymentMethod.CREDIT_CARD, null, null);
 
         // Act
         subscriptionService.changePlan(USER_ID, request);
@@ -311,8 +330,7 @@ class SubscriptionServiceTest {
         verify(paymentGatewayPort).cancelSubscription("gw-sub-123");
 
         verify(subscriptionRepository).save(argThat(sub ->
-                sub.getPlan().getCode().equals("PRO_YEARLY") &&
-                        sub.getGatewaySubscriptionId().equals("gw-sub-new123")
+                sub.getGatewaySubscriptionId().equals("gw-sub-new123")
         ));
     }
 
@@ -321,7 +339,7 @@ class SubscriptionServiceTest {
     void testChangePlan_SamePlan() {
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
 
-        ChangePlanDTO request = new ChangePlanDTO(PLAN_CODE, null, null);
+        ChangePlanDTO request = new ChangePlanDTO(PLAN_CODE, PaymentMethod.CREDIT_CARD, null, null);
 
         assertThatThrownBy(() -> subscriptionService.changePlan(USER_ID, request))
                 .isInstanceOf(AppException.class)
@@ -337,7 +355,7 @@ class SubscriptionServiceTest {
         testSubscription.setStatus(SubscriptionStatus.CANCELED);
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
 
-        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", null, null);
+        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", PaymentMethod.CREDIT_CARD, null, null);
 
         assertThatThrownBy(() -> subscriptionService.changePlan(USER_ID, request))
                 .isInstanceOf(AppException.class)

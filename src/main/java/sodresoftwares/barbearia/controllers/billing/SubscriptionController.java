@@ -3,17 +3,14 @@ package sodresoftwares.barbearia.controllers.billing;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import sodresoftwares.barbearia.dto.billing.ChangePlanDTO;
-import sodresoftwares.barbearia.dto.billing.CheckoutRequest;
+import sodresoftwares.barbearia.dto.billing.CheckoutRequestDTO;
 import sodresoftwares.barbearia.dto.billing.CheckoutResponseDTO;
 import sodresoftwares.barbearia.dto.billing.SubscriptionResponseDTO;
 import sodresoftwares.barbearia.model.user.User;
 import sodresoftwares.barbearia.services.billing.SubscriptionService;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/subscriptions")
@@ -24,7 +21,7 @@ public class SubscriptionController {
 
     @PostMapping("/checkout")
     public ResponseEntity<CheckoutResponseDTO> processCheckout(
-            @Valid @RequestBody CheckoutRequest request,
+            @Valid @RequestBody CheckoutRequestDTO request,
             @AuthenticationPrincipal User loggedInUser) {
 
         CheckoutResponseDTO response = subscriptionService.processTransparentCheckout(loggedInUser.getId(), request);
@@ -36,11 +33,12 @@ public class SubscriptionController {
         }
     }
 
-    @PutMapping("/credit-card")
-    public ResponseEntity<Void> updateCreditCard(
+    @PutMapping("/payment-method")
+    public ResponseEntity<Void> updatePaymentMethod(
             @AuthenticationPrincipal User loggedInUser,
-            @RequestBody @Valid CheckoutRequest request) {
-        subscriptionService.updateCreditCard(loggedInUser.getId(), request);
+            @RequestBody @Valid CheckoutRequestDTO request) {
+
+        subscriptionService.updatePaymentMethod(loggedInUser.getId(), request);
         return ResponseEntity.ok().build();
     }
 

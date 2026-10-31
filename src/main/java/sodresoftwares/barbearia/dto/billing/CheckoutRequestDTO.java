@@ -3,13 +3,14 @@ package sodresoftwares.barbearia.dto.billing;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import sodresoftwares.barbearia.model.billing.PaymentMethod;
 
-public record CheckoutRequest(
+public record CheckoutRequestDTO(
         @NotBlank(message = "Plan ID is required")
         String planId,
 
-        @NotBlank(message = "Payment method is required (CREDIT_CARD or PIX)")
-        String paymentMethod,
+        @NotNull(message = "Payment method is required")
+        PaymentMethod paymentMethod,
 
         @NotNull(message = "Credit card data is required")
         @Valid

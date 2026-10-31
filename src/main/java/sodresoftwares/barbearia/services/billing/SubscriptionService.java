@@ -52,7 +52,7 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public CheckoutResponseDTO processTransparentCheckout(String userId, CheckoutRequest request) {
+    public CheckoutResponseDTO processTransparentCheckout(String userId, CheckoutRequestDTO request) {
         Subscription subscription = getSubscriptionByUser(userId);
 
         if (subscription.getStatus() == SubscriptionStatus.ACTIVE && subscription.getGatewaySubscriptionId() != null) {
@@ -74,7 +74,7 @@ public class SubscriptionService {
         subscription.setBillingAnchorDay(today.getDayOfMonth());
         subscription.setCancelAtPeriodEnd(false);
 
-        if ("CREDIT_CARD".equalsIgnoreCase(request.paymentMethod())) {
+        if (request.paymentMethod() == PaymentMethod.CREDIT_CARD) {
             var checkoutResponse = paymentGatewayPort.processCreditCardCheckout(
                     business, plan, customerId, request.creditCard(), request.creditCardHolderInfo()
             );
@@ -91,7 +91,7 @@ public class SubscriptionService {
             log.info("Credit Card checkout processed for business {}. Waiting for webhook confirmation.", business.getId());
             return null;
 
-        } else if ("PIX".equalsIgnoreCase(request.paymentMethod())) {
+        } else if (request.paymentMethod() == PaymentMethod.PIX) {
             var pixResponse = paymentGatewayPort.processPixCheckout(business, plan, customerId);
 
             subscription.setGatewaySubscriptionId(pixResponse.gatewaySubscriptionId());
@@ -109,23 +109,41 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public void updateCreditCard(String userId, CheckoutRequest request) {
+    public void updatePaymentMethod(String userId, CheckoutRequestDTO request) {
         Subscription subscription = getSubscriptionByUser(userId);
         requireGatewaySubscriptionId(subscription);
 
-        var gatewayResponse = paymentGatewayPort.updateSubscriptionCreditCard(
-                subscription.getGatewaySubscriptionId(),
-                request.creditCard(),
-                request.creditCardHolderInfo()
-        );
+        if (request.paymentMethod() == PaymentMethod.PIX) {
+            paymentGatewayPort.updateSubscriptionPaymentMethod(
+                    subscription.getGatewaySubscriptionId(),
+                    PaymentMethod.PIX,
+                    null,
+                    null
+            );
 
-        BusinessPaymentMethod paymentMethod = getOrCreatePaymentMethod(subscription.getBusiness());
-        paymentMethod.setCardBrand(gatewayResponse.cardBrand());
-        paymentMethod.setLastFourDigits(gatewayResponse.lastFourDigits());
-        paymentMethod.setCreditCardToken(gatewayResponse.creditCardToken());
-        paymentMethodRepository.save(paymentMethod);
+            paymentMethodRepository.findByBusinessId(subscription.getBusiness().getId())
+                    .ifPresent(paymentMethodRepository::delete);
 
-        log.info("Credit card updated successfully for business {}.", subscription.getBusiness().getId());
+            log.info("Payment method updated to PIX for business {}.", subscription.getBusiness().getId());
+
+        } else if (request.paymentMethod() == PaymentMethod.CREDIT_CARD) {
+            var gatewayResponse = paymentGatewayPort.updateSubscriptionPaymentMethod(
+                    subscription.getGatewaySubscriptionId(),
+                    PaymentMethod.CREDIT_CARD,
+                    request.creditCard(),
+                    request.creditCardHolderInfo()
+            );
+
+            BusinessPaymentMethod paymentMethod = getOrCreatePaymentMethod(subscription.getBusiness());
+            paymentMethod.setCardBrand(gatewayResponse.cardBrand());
+            paymentMethod.setLastFourDigits(gatewayResponse.lastFourDigits());
+            paymentMethod.setCreditCardToken(gatewayResponse.creditCardToken());
+            paymentMethodRepository.save(paymentMethod);
+
+            log.info("Credit card updated successfully for business {}.", subscription.getBusiness().getId());
+        } else {
+            throw new AppException(HttpStatus.BAD_REQUEST, "INVALID_PAYMENT_METHOD", "Supported methods are CREDIT_CARD or PIX.");
+        }
     }
 
     @Transactional
@@ -140,7 +158,6 @@ public class SubscriptionService {
                     "You can only change the plan of an active subscription."
             );
         }
-
         if (subscription.getPlan().getCode().equals(request.planId())) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
@@ -150,31 +167,40 @@ public class SubscriptionService {
         }
 
         Plan newPlan = getPlanByCode(request.planId());
-        BusinessPaymentMethod paymentMethod = getExistingPaymentMethod(subscription.getBusiness().getId());
+        String savedToken = null;
+
+        if (request.paymentMethod() == PaymentMethod.CREDIT_CARD && request.creditCard() == null) {
+            BusinessPaymentMethod paymentMethod = getExistingPaymentMethod(subscription.getBusiness().getId());
+            savedToken = paymentMethod.getCreditCardToken();
+        }
 
         paymentGatewayPort.cancelSubscription(subscription.getGatewaySubscriptionId());
-
-        String savedToken = request.creditCard() == null ? paymentMethod.getCreditCardToken() : null;
 
         var gatewayResponse = paymentGatewayPort.createScheduledSubscription(
                 subscription.getBusiness(),
                 newPlan,
                 subscription.getGatewayCustomerId(),
+                request.paymentMethod(),
                 savedToken,
                 request.creditCard(),
                 request.creditCardHolderInfo(),
                 subscription.getCurrentPeriodEnd()
         );
 
-        if (request.creditCard() != null) {
-            paymentMethod.setCardBrand(gatewayResponse.cardBrand());
-            paymentMethod.setLastFourDigits(gatewayResponse.lastFourDigits());
-            paymentMethod.setCreditCardToken(gatewayResponse.creditCardToken());
-            paymentMethodRepository.save(paymentMethod);
+        if (request.paymentMethod() == PaymentMethod.CREDIT_CARD) {
+            if (request.creditCard() != null) {
+                BusinessPaymentMethod paymentMethod = getOrCreatePaymentMethod(subscription.getBusiness());
+                paymentMethod.setCardBrand(gatewayResponse.cardBrand());
+                paymentMethod.setLastFourDigits(gatewayResponse.lastFourDigits());
+                paymentMethod.setCreditCardToken(gatewayResponse.creditCardToken());
+                paymentMethodRepository.save(paymentMethod);
+            }
+        } else if (request.paymentMethod() == PaymentMethod.PIX) {
+            paymentMethodRepository.findByBusinessId(subscription.getBusiness().getId())
+                    .ifPresent(paymentMethodRepository::delete);
         }
 
         subscription.setGatewaySubscriptionId(gatewayResponse.gatewaySubscriptionId());
-        subscription.setPlan(newPlan);
         subscriptionRepository.save(subscription);
 
         log.info("Plan changed successfully for business {} to plan {}. Scheduled to start charging on {}",
