@@ -197,6 +197,8 @@ public class SubscriptionService {
                     .ifPresent(paymentMethodRepository::delete);
         }
 
+
+        subscription.setPlan(newPlan);
         subscription.setPaymentMethod(request.paymentMethod());
         subscription.setGatewaySubscriptionId(gatewayResponse.gatewaySubscriptionId());
         subscriptionRepository.save(subscription);
