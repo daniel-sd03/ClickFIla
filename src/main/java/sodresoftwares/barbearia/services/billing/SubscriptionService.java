@@ -106,7 +106,10 @@ public class SubscriptionService {
             subscription.setPaymentMethod(PaymentMethod.PIX);
             subscriptionRepository.save(subscription);
 
-            CheckoutResponseDTO pixResponse = paymentGatewayPort.getPendingPixQrCode(subscription.getGatewaySubscriptionId());
+            CheckoutResponseDTO pixResponse = null;
+            if (subscription.getStatus() == SubscriptionStatus.PENDING) {
+                pixResponse = paymentGatewayPort.getPendingPixQrCode(subscription.getGatewaySubscriptionId());
+            }
 
             log.info("Payment method updated to PIX for business {}.", subscription.getBusiness().getId());
             return pixResponse;

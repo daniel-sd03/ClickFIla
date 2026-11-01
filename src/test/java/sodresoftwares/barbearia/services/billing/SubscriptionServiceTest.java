@@ -307,11 +307,13 @@ class SubscriptionServiceTest {
     }
 
     @Test
-    @DisplayName("Should update payment method to PIX, delete old card and fetch new QR Code")
-    void testUpdatePaymentMethod_Pix_Success() {
+    @DisplayName("Should update payment method to PIX, delete old card and fetch new QR Code when PENDING")
+    void testUpdatePaymentMethod_Pix_Pending_Success() {
         CheckoutRequestDTO pixRequest = new CheckoutRequestDTO(PLAN_CODE, PaymentMethod.PIX,
                 null, null, null);
         BusinessPaymentMethod existingCard = BusinessPaymentMethod.builder().id("card-1").business(testBusiness).build();
+
+        testSubscription.setStatus(SubscriptionStatus.PENDING);
 
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
         when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.of(existingCard));
@@ -326,6 +328,26 @@ class SubscriptionServiceTest {
                 isNull(), isNull(), isNull());
         verify(paymentMethodRepository).delete(existingCard);
         assertThat(result.pixCopiaECola()).isEqualTo("copiacola");
+    }
+
+    @Test
+    @DisplayName("Should update payment method to PIX and NOT fetch QR Code when ACTIVE")
+    void testUpdatePaymentMethod_Pix_Active_Success() {
+        CheckoutRequestDTO pixRequest = new CheckoutRequestDTO(PLAN_CODE, PaymentMethod.PIX,
+                null, null, null);
+        BusinessPaymentMethod existingCard = BusinessPaymentMethod.builder().id("card-1").business(testBusiness).build();
+
+        when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
+        when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.of(existingCard));
+
+        CheckoutResponseDTO result = subscriptionService.updatePaymentMethod(USER_ID, pixRequest);
+
+        verify(paymentGatewayPort).updateSubscriptionPaymentMethod(eq("gw-sub-123"), eq(PaymentMethod.PIX),
+                isNull(), isNull(), isNull());
+        verify(paymentMethodRepository).delete(existingCard);
+
+        verify(paymentGatewayPort, never()).getPendingPixQrCode(anyString());
+        assertThat(result).isNull();
     }
 
     @Test
