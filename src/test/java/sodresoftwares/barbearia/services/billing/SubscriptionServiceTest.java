@@ -138,11 +138,14 @@ class SubscriptionServiceTest {
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
         when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
         when(paymentGatewayPort.createOrUpdateCustomer(testBusiness)).thenReturn("gw-cus-999");
+        GatewayCreditCardResponse tokenResponse = new GatewayCreditCardResponse(null,
+                "tok_123", "VISA", "1111");
+        when(paymentGatewayPort.tokenizeCreditCard(eq("gw-cus-999"), any(), any())).thenReturn(tokenResponse);
 
         GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-999",
                 "tok_123", "VISA", "1111");
         when(paymentGatewayPort.processCreditCardCheckout(eq(testBusiness), eq(testPlan), eq("gw-cus-999"),
-                isNull(), any(), any())).thenReturn(mockResponse);
+                eq("tok_123"), isNull(), isNull())).thenReturn(mockResponse);
 
         subscriptionService.processTransparentCheckout(USER_ID, testCheckoutRequest);
 
@@ -166,11 +169,13 @@ class SubscriptionServiceTest {
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
         when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
         when(paymentGatewayPort.createOrUpdateCustomer(testBusiness)).thenReturn("gw-cus-999");
-
+        GatewayCreditCardResponse tokenResponse = new GatewayCreditCardResponse(null,
+                "tok_new", "VISA", "1234");
+        when(paymentGatewayPort.tokenizeCreditCard(eq("gw-cus-999"), any(), any())).thenReturn(tokenResponse);
         GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-new123",
                 "tok_new", "VISA", "1234");
         when(paymentGatewayPort.createScheduledSubscription(any(), any(), any(), eq(PaymentMethod.CREDIT_CARD),
-                isNull(), any(), any(), eq(testSubscription.getCurrentPeriodEnd()))).thenReturn(mockResponse);
+                eq("tok_new"), isNull(), isNull(), eq(testSubscription.getCurrentPeriodEnd()))).thenReturn(mockResponse);
 
         subscriptionService.processTransparentCheckout(USER_ID, testCheckoutRequest);
 
@@ -288,6 +293,10 @@ class SubscriptionServiceTest {
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
         when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.of(existingCard));
 
+        GatewayCreditCardResponse tokenResponse = new GatewayCreditCardResponse(null,
+                "tok_new999", "MASTERCARD", "4444");
+        when(paymentGatewayPort.tokenizeCreditCard(eq("gw-cus-123"), any(), any())).thenReturn(tokenResponse);
+
         GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-123",
                 "tok_new", "VISA", "1111");
         when(paymentGatewayPort.updateSubscriptionPaymentMethod(any(), any(), any(), any(), any())).thenReturn(mockResponse);
@@ -325,10 +334,14 @@ class SubscriptionServiceTest {
         // Arrange
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
         when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.empty());
+        GatewayCreditCardResponse tokenResponse = new GatewayCreditCardResponse(null,
+                "tok_new999", "MASTERCARD", "4444");
+        when(paymentGatewayPort.tokenizeCreditCard(eq("gw-cus-123"), any(), any())).thenReturn(tokenResponse);
 
-        GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-123", "tok_new999", "MASTERCARD", "4444");
+        GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-123",
+                "tok_new999", "MASTERCARD", "4444");
         when(paymentGatewayPort.updateSubscriptionPaymentMethod(eq("gw-sub-123"), eq(PaymentMethod.CREDIT_CARD),
-                isNull(), any(), any())).thenReturn(mockResponse);
+                eq("tok_new999"), isNull(), isNull())).thenReturn(mockResponse);
 
         // Act
         subscriptionService.updatePaymentMethod(USER_ID, testCheckoutRequest);
@@ -362,37 +375,34 @@ class SubscriptionServiceTest {
     // ==================== CHANGE PLAN TESTS ====================
 
     @Test
-    @DisplayName("Should change plan successfully using saved credit card token")
-    void testChangePlan_Success_SavedToken() {
+    @DisplayName("Should change plan successfully tokenizing a new credit card")
+    void testChangePlan_Success_NewCard() {
         // Arrange
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
-
         Plan newPlan = Plan.builder().id("plan-456").code("PRO_YEARLY").name("Plano Anual").build();
         when(planRepository.findByCode("PRO_YEARLY")).thenReturn(Optional.of(newPlan));
+        when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.empty());
+        GatewayCreditCardResponse tokenResponse = new GatewayCreditCardResponse(null,
+                "tok_777", "AMEX", "8888");
+        when(paymentGatewayPort.tokenizeCreditCard(eq("gw-cus-123"), any(), any())).thenReturn(tokenResponse);
 
-        BusinessPaymentMethod savedMethod = BusinessPaymentMethod.builder()
-                .id("card-999")
-                .business(testBusiness)
-                .creditCardToken("tok_123")
-                .build();
-
-        when(paymentMethodRepository.findById("card-999")).thenReturn(Optional.of(savedMethod));
-
-        GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-new123", "tok_123", "VISA", "1111");
+        GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-new123",
+                "tok_777", "AMEX", "8888");
 
         when(paymentGatewayPort.createScheduledSubscription(
-                eq(testBusiness), eq(newPlan), eq("gw-cus-123"), eq(PaymentMethod.CREDIT_CARD), eq("tok_123"), isNull(), isNull(), eq(testSubscription.getCurrentPeriodEnd())
+                eq(testBusiness), eq(newPlan), eq("gw-cus-123"), eq(PaymentMethod.CREDIT_CARD), eq("tok_777"),
+                isNull(), isNull(), eq(testSubscription.getCurrentPeriodEnd())
         )).thenReturn(mockResponse);
-
-        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", PaymentMethod.CREDIT_CARD, "card-999", null, null);
+        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", PaymentMethod.CREDIT_CARD, null,
+                testCheckoutRequest.creditCard(), testCheckoutRequest.creditCardHolderInfo());
 
         // Act
         subscriptionService.changePlan(USER_ID, request);
 
         // Assert
         verify(paymentGatewayPort).cancelSubscription("gw-sub-123");
-        verify(subscriptionRepository).save(argThat(sub ->
-                sub.getGatewaySubscriptionId().equals("gw-sub-new123")
+        verify(paymentMethodRepository).save(argThat(method ->
+                method.getCreditCardToken().equals("tok_777")
         ));
     }
 

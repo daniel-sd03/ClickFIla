@@ -241,6 +241,50 @@ class AsaasPaymentAdapterTest {
         assertThat(response.creditCardToken()).isEqualTo("tok_existing123");
     }
 
+    // ==================== TOKENIZE CREDIT CARD TESTS ====================
+
+    @Test
+    @DisplayName("Should tokenize credit card and return data successfully")
+    void shouldTokenizeCreditCardSuccessfully() {
+        String expectedJsonResponse = """
+                {
+                    "creditCardNumber": "1234",
+                    "creditCardBrand": "VISA",
+                    "creditCardToken": "tok_1234abc"
+                }
+                """;
+
+        mockServer.expect(requestTo(API_URL + "/creditCard/tokenizeCreditCard"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.customer").value("cus_123"))
+                .andExpect(jsonPath("$.remoteIp").value("192.168.0.1"))
+                .andExpect(jsonPath("$.creditCard.holderName").value("DANIEL S S PAULA"))
+                .andExpect(jsonPath("$.creditCardHolderInfo.cpfCnpj").value("12345678909"))
+                .andRespond(withSuccess(expectedJsonResponse, MediaType.APPLICATION_JSON));
+
+        GatewayCreditCardResponse response = adapter.tokenizeCreditCard("cus_123",
+                testCreditCard, testHolder);
+
+        assertThat(response).isNotNull();
+        assertThat(response.gatewaySubscriptionId()).isNull();
+        assertThat(response.creditCardToken()).isEqualTo("tok_1234abc");
+        assertThat(response.cardBrand()).isEqualTo("VISA");
+        assertThat(response.lastFourDigits()).isEqualTo("1234");
+    }
+
+    @Test
+    @DisplayName("Should throw BAD_REQUEST when credit card is rejected during tokenization")
+    void shouldThrowWhenCardRejectedOnTokenization() {
+        mockServer.expect(requestTo(API_URL + "/creditCard/tokenizeCreditCard"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST));
+
+        assertThatThrownBy(() -> adapter.tokenizeCreditCard("cus_123",
+                testCreditCard, testHolder))
+                .isInstanceOf(AppException.class)
+                .hasMessage("The credit card data is invalid or was rejected by the gateway.")
+                .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
     // ==================== PIX CHECKOUT TESTS ====================
 
     @Test

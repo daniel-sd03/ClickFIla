@@ -113,27 +113,21 @@ public class SubscriptionService {
 
         } else if (request.paymentMethod() == PaymentMethod.CREDIT_CARD) {
 
-            String savedToken = null;
-            if (request.savedCardId() != null) {
-                BusinessPaymentMethod existingMethod = getPaymentMethodByIdAndBusiness(request.savedCardId(), subscription.getBusiness().getId());
-                savedToken = existingMethod.getCreditCardToken();
-            }
-
-            var gatewayResponse = paymentGatewayPort.updateSubscriptionPaymentMethod(
-                    subscription.getGatewaySubscriptionId(),
-                    PaymentMethod.CREDIT_CARD,
-                    savedToken,
+            String savedToken = resolveAndSaveCreditCardToken(
+                    subscription.getGatewayCustomerId(),
+                    subscription.getBusiness(),
+                    request.savedCardId(),
                     request.creditCard(),
                     request.creditCardHolderInfo()
             );
 
-            if (request.creditCard() != null) {
-                BusinessPaymentMethod paymentMethod = getOrCreatePaymentMethod(subscription.getBusiness());
-                paymentMethod.setCardBrand(gatewayResponse.cardBrand());
-                paymentMethod.setLastFourDigits(gatewayResponse.lastFourDigits());
-                paymentMethod.setCreditCardToken(gatewayResponse.creditCardToken());
-                paymentMethodRepository.save(paymentMethod);
-            }
+            paymentGatewayPort.updateSubscriptionPaymentMethod(
+                    subscription.getGatewaySubscriptionId(),
+                    PaymentMethod.CREDIT_CARD,
+                    savedToken,
+                    null,
+                    null
+            );
 
             subscription.setPaymentMethod(PaymentMethod.CREDIT_CARD);
             subscriptionRepository.save(subscription);
@@ -172,9 +166,14 @@ public class SubscriptionService {
         Plan newPlan = getPlanByCode(request.planId());
         String savedToken = null;
 
-        if (request.paymentMethod() == PaymentMethod.CREDIT_CARD && request.savedCardId() != null) {
-            BusinessPaymentMethod paymentMethod = getPaymentMethodByIdAndBusiness(request.savedCardId(), subscription.getBusiness().getId());
-            savedToken = paymentMethod.getCreditCardToken();
+        if (request.paymentMethod() == PaymentMethod.CREDIT_CARD) {
+            savedToken = resolveAndSaveCreditCardToken(
+                    subscription.getGatewayCustomerId(),
+                    subscription.getBusiness(),
+                    request.savedCardId(),
+                    request.creditCard(),
+                    request.creditCardHolderInfo()
+            );
         }
 
         paymentGatewayPort.cancelSubscription(subscription.getGatewaySubscriptionId());
@@ -185,25 +184,16 @@ public class SubscriptionService {
                 subscription.getGatewayCustomerId(),
                 request.paymentMethod(),
                 savedToken,
-                request.creditCard(),
-                request.creditCardHolderInfo(),
+                null,
+                null,
                 subscription.getCurrentPeriodEnd()
         );
 
-        if (request.paymentMethod() == PaymentMethod.CREDIT_CARD) {
-            if (request.creditCard() != null) {
-                BusinessPaymentMethod paymentMethod = getOrCreatePaymentMethod(subscription.getBusiness());
-                paymentMethod.setCardBrand(gatewayResponse.cardBrand());
-                paymentMethod.setLastFourDigits(gatewayResponse.lastFourDigits());
-                paymentMethod.setCreditCardToken(gatewayResponse.creditCardToken());
-                paymentMethodRepository.save(paymentMethod);
-            }
-        } else if (request.paymentMethod() == PaymentMethod.PIX) {
+        if (request.paymentMethod() == PaymentMethod.PIX) {
             paymentMethodRepository.findByBusinessId(subscription.getBusiness().getId())
                     .ifPresent(paymentMethodRepository::delete);
         }
 
-        subscription.setPlan(newPlan);
         subscription.setPaymentMethod(request.paymentMethod());
         subscription.setGatewaySubscriptionId(gatewayResponse.gatewaySubscriptionId());
         subscriptionRepository.save(subscription);
@@ -291,42 +281,26 @@ public class SubscriptionService {
 
         PaymentGatewayPort.GatewayCreditCardResponse gatewayResponse;
 
-        String savedToken = null;
-        if (request.savedCardId() != null) {
-            BusinessPaymentMethod existingMethod = getPaymentMethodByIdAndBusiness(request.savedCardId(), business.getId());
-            savedToken = existingMethod.getCreditCardToken();
-        }
+        String savedToken = resolveAndSaveCreditCardToken(
+                customerId,
+                business,
+                request.savedCardId(),
+                request.creditCard(),
+                request.creditCardHolderInfo()
+        );
 
         if (hasValidDays) {
             gatewayResponse = paymentGatewayPort.createScheduledSubscription(
-                    business,
-                    plan,
-                    customerId,
-                    PaymentMethod.CREDIT_CARD,
-                    savedToken,
-                    request.creditCard(),
-                    request.creditCardHolderInfo(),
+                    business, plan, customerId, PaymentMethod.CREDIT_CARD, savedToken, null, null,
                     subscription.getCurrentPeriodEnd()
             );
-
             subscription.setStatus(SubscriptionStatus.ACTIVE);
             log.info("Subscription reactivated and scheduled to charge on {}", subscription.getCurrentPeriodEnd());
         } else {
             gatewayResponse = paymentGatewayPort.processCreditCardCheckout(
-                    business, plan, customerId, savedToken, request.creditCard(), request.creditCardHolderInfo()
+                    business, plan, customerId, savedToken, null, null
             );
             subscription.setStatus(SubscriptionStatus.PENDING);
-        }
-
-        if (request.creditCard() != null) {
-            BusinessPaymentMethod paymentMethod = getOrCreatePaymentMethod(business);
-            String brand = gatewayResponse.cardBrand();
-            String lastFour = gatewayResponse.lastFourDigits() != null ? gatewayResponse.lastFourDigits() : request.creditCard().number().substring(request.creditCard().number().length() - 4);
-
-            paymentMethod.setCardBrand(brand);
-            paymentMethod.setLastFourDigits(lastFour);
-            paymentMethod.setCreditCardToken(gatewayResponse.creditCardToken());
-            paymentMethodRepository.save(paymentMethod);
         }
 
         subscription.setPaymentMethod(PaymentMethod.CREDIT_CARD);
@@ -376,6 +350,36 @@ public class SubscriptionService {
 
         log.info("PIX checkout processed for business {}.", business.getId());
         return pixResponse;
+    }
+
+    private String resolveAndSaveCreditCardToken(
+            String gatewayCustomerId,
+            Business business,
+            String savedCardId,
+            CreditCardDTO creditCard,
+            CreditCardHolderDTO holderInfo) {
+
+        if (savedCardId != null) {
+            BusinessPaymentMethod existingMethod = getPaymentMethodByIdAndBusiness(savedCardId, business.getId());
+            return existingMethod.getCreditCardToken();
+
+        } else if (creditCard != null) {
+            var tokenResponse = paymentGatewayPort.tokenizeCreditCard(gatewayCustomerId, creditCard, holderInfo);
+
+            BusinessPaymentMethod paymentMethod = getOrCreatePaymentMethod(business);
+            paymentMethod.setCardBrand(tokenResponse.cardBrand());
+            paymentMethod.setLastFourDigits(tokenResponse.lastFourDigits());
+            paymentMethod.setCreditCardToken(tokenResponse.creditCardToken());
+            paymentMethodRepository.save(paymentMethod);
+
+            return tokenResponse.creditCardToken();
+        }
+
+        throw new AppException(
+                HttpStatus.BAD_REQUEST,
+                "MISSING_PAYMENT_DATA",
+                "Credit card data or saved card ID is required."
+        );
     }
 
     private Subscription getSubscriptionByUser(String userId) {

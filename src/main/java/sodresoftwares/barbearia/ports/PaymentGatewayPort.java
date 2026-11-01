@@ -57,6 +57,15 @@ public interface PaymentGatewayPort {
     );
 
     /**
+     * Tokenizes a credit card in the Gateway to obtain the official Brand and last 4 digits.
+     */
+    GatewayCreditCardResponse tokenizeCreditCard(
+            String gatewayCustomerId,
+            CreditCardDTO creditCard,
+            CreditCardHolderDTO holderInfo
+    );
+
+    /**
      * Processes a PIX subscription checkout.
      * Returns the PIX QR Code payload and Base64 image for the first invoice.
      */

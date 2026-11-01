@@ -178,6 +178,48 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
     }
 
     @Override
+    public GatewayCreditCardResponse tokenizeCreditCard(
+            String gatewayCustomerId,
+            CreditCardDTO creditCard,
+            CreditCardHolderDTO holderInfo) {
+
+        var requestBody = Map.of(
+                "customer", gatewayCustomerId,
+                "creditCard", buildCreditCardPayload(creditCard),
+                "creditCardHolderInfo", buildHolderPayload(holderInfo),
+                "remoteIp", getClientIpAddress()
+        );
+
+        var response = restClient.post()
+                .uri("/creditCard/tokenizeCreditCard")
+                .body(requestBody)
+                .retrieve()
+                .onStatus(status -> status.is4xxClientError(), (req, res) -> {
+                    throw new AppException(
+                            HttpStatus.BAD_REQUEST,
+                            "INVALID_CARD",
+                            "The credit card data is invalid or was rejected by the gateway."
+                    );
+                })
+                .body(Map.class);
+
+        if (response == null || !response.containsKey("creditCardToken")) {
+            throw new AppException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "GATEWAY_ERROR",
+                    "Failed to tokenize the credit card."
+            );
+        }
+
+        return new GatewayCreditCardResponse(
+                null,
+                (String) response.get("creditCardToken"),
+                (String) response.get("creditCardBrand"),
+                (String) response.get("creditCardNumber")
+        );
+    }
+
+    @Override
     public CheckoutResponseDTO processPixCheckout(Business business, Plan plan, String gatewayCustomerId) {
         String cycle = plan.getBillingCycle().name();
 
