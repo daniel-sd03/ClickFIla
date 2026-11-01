@@ -39,6 +39,10 @@ public class Subscription {
     @Column(name = "payment_provider", nullable = false, length = 30)
     private PaymentProvider paymentProvider;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method")
+    private PaymentMethod paymentMethod;
+
     @Column(name = "gateway_subscription_id", unique = true, length = 100)
     private String gatewaySubscriptionId;
 
@@ -57,10 +61,6 @@ public class Subscription {
 
     @Column(name = "current_period_end", nullable = false)
     private LocalDate currentPeriodEnd;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method")
-    private PaymentMethod paymentMethod;
 
     @Builder.Default
     @Column(name = "cancel_at_period_end", nullable = false)
