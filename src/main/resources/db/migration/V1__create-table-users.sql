@@ -162,6 +162,7 @@ CREATE TABLE subscriptions
     business_id             TEXT UNIQUE               NOT NULL,
     plan_id                 TEXT,
     payment_provider        VARCHAR(30)               NOT NULL,
+    payment_method          VARCHAR(30),
     gateway_subscription_id VARCHAR(100) UNIQUE,
     gateway_customer_id     VARCHAR(100),
     status                  VARCHAR(30)               NOT NULL,
