@@ -12,6 +12,8 @@ public record ChangePlanDTO(
         @NotNull(message = "Payment method is required")
         PaymentMethod paymentMethod,
 
+        String savedCardId,
+
         @Valid
         CreditCardDTO creditCard,
 

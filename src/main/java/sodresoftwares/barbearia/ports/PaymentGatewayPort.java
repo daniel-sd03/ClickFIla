@@ -25,6 +25,7 @@ public interface PaymentGatewayPort {
             Business business,
             Plan plan,
             String gatewayCustomerId,
+            String creditCardToken,
             CreditCardDTO creditCard,
             CreditCardHolderDTO holderInfo
     );
@@ -35,6 +36,7 @@ public interface PaymentGatewayPort {
     GatewayCreditCardResponse updateSubscriptionPaymentMethod(
             String gatewaySubscriptionId,
             PaymentMethod paymentMethod,
+            String creditCardToken,
             CreditCardDTO creditCard,
             CreditCardHolderDTO holderInfo
     );

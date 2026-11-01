@@ -14,18 +14,11 @@ public record CheckoutRequestDTO(
         @NotNull(message = "Payment method is required")
         PaymentMethod paymentMethod,
 
+        String savedCardId,
+
         @Valid
         CreditCardDTO creditCard,
 
         @Valid
         CreditCardHolderDTO creditCardHolderInfo
-) {
-        @JsonIgnore
-        @AssertTrue(message = "Credit card data and holder info are required when payment method is CREDIT_CARD")
-        public boolean isCreditCardValid() {
-                if (this.paymentMethod == PaymentMethod.CREDIT_CARD) {
-                        return this.creditCard != null && this.creditCardHolderInfo != null;
-                }
-                return true;
-        }
-}
+) {}

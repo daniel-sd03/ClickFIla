@@ -103,8 +103,11 @@ class SubscriptionServiceTest {
         );
         testCheckoutRequest = new CheckoutRequestDTO(
                 PLAN_CODE,
-                PaymentMethod.CREDIT_CARD, // 👈 Alterado para Enum
-                ccDto, holderDto);
+                PaymentMethod.CREDIT_CARD,
+                null,
+                ccDto,
+                holderDto
+        );
     }
 
     // ==================== CREATE TRIAL TESTS ====================
@@ -139,7 +142,7 @@ class SubscriptionServiceTest {
         GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-999",
                 "tok_123", "VISA", "1111");
         when(paymentGatewayPort.processCreditCardCheckout(eq(testBusiness), eq(testPlan), eq("gw-cus-999"),
-                any(), any())).thenReturn(mockResponse);
+                isNull(), any(), any())).thenReturn(mockResponse);
 
         subscriptionService.processTransparentCheckout(USER_ID, testCheckoutRequest);
 
@@ -185,7 +188,8 @@ class SubscriptionServiceTest {
         testSubscription.setGatewaySubscriptionId(null);
         testSubscription.setCurrentPeriodEnd(LocalDate.now().minusDays(1));
 
-        CheckoutRequestDTO pixRequest = new CheckoutRequestDTO(PLAN_CODE, PaymentMethod.PIX, null, null);
+        CheckoutRequestDTO pixRequest = new CheckoutRequestDTO(PLAN_CODE, PaymentMethod.PIX,
+                null, null, null);
 
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
         when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
@@ -210,7 +214,8 @@ class SubscriptionServiceTest {
         testSubscription.setStatus(SubscriptionStatus.CANCELED);
         testSubscription.setCancelAtPeriodEnd(true);
 
-        CheckoutRequestDTO pixRequest = new CheckoutRequestDTO(PLAN_CODE, PaymentMethod.PIX, null, null);
+        CheckoutRequestDTO pixRequest = new CheckoutRequestDTO(PLAN_CODE, PaymentMethod.PIX,
+                null, null, null);
 
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
         when(planRepository.findByCode(PLAN_CODE)).thenReturn(Optional.of(testPlan));
@@ -270,7 +275,7 @@ class SubscriptionServiceTest {
                 .hasMessage("You already have an ongoing or active subscription. Use the payment method update endpoint.")
                 .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
 
-        verify(paymentGatewayPort, never()).processCreditCardCheckout(any(), any(), any(), any(), any());
+        verify(paymentGatewayPort, never()).processCreditCardCheckout(any(), any(), any(), any(), any(), any());
     }
 
     // ==================== UPDATE PAYMENT METHOD TESTS ====================
@@ -285,7 +290,7 @@ class SubscriptionServiceTest {
 
         GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-123",
                 "tok_new", "VISA", "1111");
-        when(paymentGatewayPort.updateSubscriptionPaymentMethod(any(), any(), any(), any())).thenReturn(mockResponse);
+        when(paymentGatewayPort.updateSubscriptionPaymentMethod(any(), any(), any(), any(), any())).thenReturn(mockResponse);
 
         subscriptionService.updatePaymentMethod(USER_ID, testCheckoutRequest);
 
@@ -295,7 +300,8 @@ class SubscriptionServiceTest {
     @Test
     @DisplayName("Should update payment method to PIX, delete old card and fetch new QR Code")
     void testUpdatePaymentMethod_Pix_Success() {
-        CheckoutRequestDTO pixRequest = new CheckoutRequestDTO(PLAN_CODE, PaymentMethod.PIX, null, null);
+        CheckoutRequestDTO pixRequest = new CheckoutRequestDTO(PLAN_CODE, PaymentMethod.PIX,
+                null, null, null);
         BusinessPaymentMethod existingCard = BusinessPaymentMethod.builder().id("card-1").business(testBusiness).build();
 
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
@@ -307,7 +313,8 @@ class SubscriptionServiceTest {
 
         CheckoutResponseDTO result = subscriptionService.updatePaymentMethod(USER_ID, pixRequest);
 
-        verify(paymentGatewayPort).updateSubscriptionPaymentMethod(eq("gw-sub-123"), eq(PaymentMethod.PIX), isNull(), isNull());
+        verify(paymentGatewayPort).updateSubscriptionPaymentMethod(eq("gw-sub-123"), eq(PaymentMethod.PIX),
+                isNull(), isNull(), isNull());
         verify(paymentMethodRepository).delete(existingCard);
         assertThat(result.pixCopiaECola()).isEqualTo("copiacola");
     }
@@ -320,7 +327,8 @@ class SubscriptionServiceTest {
         when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.empty());
 
         GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-123", "tok_new999", "MASTERCARD", "4444");
-        when(paymentGatewayPort.updateSubscriptionPaymentMethod(eq("gw-sub-123"), eq(PaymentMethod.CREDIT_CARD), any(), any())).thenReturn(mockResponse);
+        when(paymentGatewayPort.updateSubscriptionPaymentMethod(eq("gw-sub-123"), eq(PaymentMethod.CREDIT_CARD),
+                isNull(), any(), any())).thenReturn(mockResponse);
 
         // Act
         subscriptionService.updatePaymentMethod(USER_ID, testCheckoutRequest);
@@ -348,7 +356,7 @@ class SubscriptionServiceTest {
                 .hasMessage("This subscription does not have an active gateway link.")
                 .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
 
-        verify(paymentGatewayPort, never()).updateSubscriptionPaymentMethod(any(), any(), any(), any());
+        verify(paymentGatewayPort, never()).updateSubscriptionPaymentMethod(any(), any(), any(), any(), any());
     }
 
     // ==================== CHANGE PLAN TESTS ====================
@@ -363,10 +371,12 @@ class SubscriptionServiceTest {
         when(planRepository.findByCode("PRO_YEARLY")).thenReturn(Optional.of(newPlan));
 
         BusinessPaymentMethod savedMethod = BusinessPaymentMethod.builder()
+                .id("card-999")
                 .business(testBusiness)
                 .creditCardToken("tok_123")
                 .build();
-        when(paymentMethodRepository.findByBusinessId(BUSINESS_ID)).thenReturn(Optional.of(savedMethod));
+
+        when(paymentMethodRepository.findById("card-999")).thenReturn(Optional.of(savedMethod));
 
         GatewayCreditCardResponse mockResponse = new GatewayCreditCardResponse("gw-sub-new123", "tok_123", "VISA", "1111");
 
@@ -374,14 +384,13 @@ class SubscriptionServiceTest {
                 eq(testBusiness), eq(newPlan), eq("gw-cus-123"), eq(PaymentMethod.CREDIT_CARD), eq("tok_123"), isNull(), isNull(), eq(testSubscription.getCurrentPeriodEnd())
         )).thenReturn(mockResponse);
 
-        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", PaymentMethod.CREDIT_CARD, null, null);
+        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", PaymentMethod.CREDIT_CARD, "card-999", null, null);
 
         // Act
         subscriptionService.changePlan(USER_ID, request);
 
         // Assert
         verify(paymentGatewayPort).cancelSubscription("gw-sub-123");
-
         verify(subscriptionRepository).save(argThat(sub ->
                 sub.getGatewaySubscriptionId().equals("gw-sub-new123")
         ));
@@ -427,7 +436,8 @@ class SubscriptionServiceTest {
     void testChangePlan_SamePlan() {
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
 
-        ChangePlanDTO request = new ChangePlanDTO(PLAN_CODE, PaymentMethod.CREDIT_CARD, null, null);
+        ChangePlanDTO request = new ChangePlanDTO(PLAN_CODE, PaymentMethod.CREDIT_CARD,
+                null, null, null);
 
         assertThatThrownBy(() -> subscriptionService.changePlan(USER_ID, request))
                 .isInstanceOf(AppException.class)
@@ -443,7 +453,8 @@ class SubscriptionServiceTest {
         testSubscription.setStatus(SubscriptionStatus.CANCELED);
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
 
-        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", PaymentMethod.CREDIT_CARD, null, null);
+        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", PaymentMethod.CREDIT_CARD,
+                null, null, null);
 
         assertThatThrownBy(() -> subscriptionService.changePlan(USER_ID, request))
                 .isInstanceOf(AppException.class)
@@ -471,8 +482,7 @@ class SubscriptionServiceTest {
     @DisplayName("Should get subscription details and calculate pending payments with date threshold")
     void testGetMySubscriptionDetails_Success() {
         // Arrange
-        testSubscription.setPaymentMethod(PaymentMethod.CREDIT_CARD); // 🔥 Mocka a forma ativa
-
+        testSubscription.setPaymentMethod(PaymentMethod.CREDIT_CARD);
         when(subscriptionRepository.findByUserIdWithBusinessAndPlan(USER_ID)).thenReturn(Optional.of(testSubscription));
 
         BusinessPaymentMethod existingCard = BusinessPaymentMethod.builder()

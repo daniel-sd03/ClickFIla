@@ -113,7 +113,7 @@ class SubscriptionControllerTest {
         );
 
         CheckoutRequestDTO request = new CheckoutRequestDTO("PRO_MONTHLY", PaymentMethod.CREDIT_CARD,
-                creditCard, holderInfo);
+                null ,creditCard, holderInfo);
 
         mockMvc.perform(post("/subscriptions/checkout")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -125,7 +125,7 @@ class SubscriptionControllerTest {
     @DisplayName("POST /subscriptions/checkout -> Should process PIX checkout and return 200 OK with QR Code")
     void shouldProcessPixCheckout() throws Exception {
         CheckoutRequestDTO request = new CheckoutRequestDTO("PRO_MONTHLY", PaymentMethod.PIX, null,
-                null);
+                null, null);
 
         CheckoutResponseDTO mockResponse = new CheckoutResponseDTO("sub-123",
                 "base64_checkout", "copiacola_checkout");
@@ -150,7 +150,7 @@ class SubscriptionControllerTest {
                 "12345678909", "30123456", "100", null,
                 "31999999999", null);
         CheckoutRequestDTO request = new CheckoutRequestDTO("PRO_MONTHLY", PaymentMethod.CREDIT_CARD,
-                creditCard, holderInfo);
+                null, creditCard, holderInfo);
 
         // O Mock
         when(subscriptionService.updatePaymentMethod(any(), any())).thenReturn(null);
@@ -165,7 +165,7 @@ class SubscriptionControllerTest {
     @DisplayName("PUT /subscriptions/payment-method -> Should update to PIX and return 200 OK with QR Code")
     void shouldUpdatePaymentMethodPix() throws Exception {
         CheckoutRequestDTO request = new CheckoutRequestDTO("PRO_MONTHLY", PaymentMethod.PIX,
-                null, null);
+                null, null, null);
         CheckoutResponseDTO mockResponse = new CheckoutResponseDTO("sub-123",
                 "base64", "copiacola");
 
@@ -204,7 +204,8 @@ class SubscriptionControllerTest {
     @Test
     @DisplayName("PUT /subscriptions/plan -> Should change plan successfully")
     void shouldChangePlan() throws Exception {
-        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", PaymentMethod.CREDIT_CARD, null, null);
+        ChangePlanDTO request = new ChangePlanDTO("PRO_YEARLY", PaymentMethod.CREDIT_CARD,
+                null, null, null);
 
         mockMvc.perform(put("/subscriptions/plan")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -234,7 +235,7 @@ class SubscriptionControllerTest {
                 new BigDecimal("50.00"),
                 BillingCycle.MONTHLY
         );
-        CreditCardSummaryDTO cardDto = new CreditCardSummaryDTO("VISA", "1234");
+        CreditCardSummaryDTO cardDto = new CreditCardSummaryDTO("card-123","VISA", "1234");
 
         SubscriptionResponseDTO responseDTO = new SubscriptionResponseDTO(
                 SubscriptionStatus.ACTIVE,
