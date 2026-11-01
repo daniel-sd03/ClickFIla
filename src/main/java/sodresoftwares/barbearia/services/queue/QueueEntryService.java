@@ -146,6 +146,15 @@ public class QueueEntryService {
             );
         }
 
+        activeEntries.stream()
+                .filter(e -> e.getStatus() == QueueEntryStatus.WAITING && !e.getId().equals(savedEntry.getId()))
+                .findFirst()
+                .ifPresent(futureNext -> {
+                    if (futureNext.getUser() != null) {
+                        pushDispatcher.notifyPrepareYourself(futureNext.getUser().getId());
+                    }
+                });
+
         return queueMapper.toSingleDto(savedEntry, activeEntries);
     }
 
