@@ -192,6 +192,7 @@ class AsaasPaymentAdapterTest {
         mockServer.expect(requestTo(API_URL + "/subscriptions/" + gatewaySubscriptionId))
                 .andExpect(method(HttpMethod.PUT))
                 .andExpect(jsonPath("$.billingType").value("CREDIT_CARD"))
+                .andExpect(jsonPath("$.updatePendingPayments").value(true))
                 .andExpect(jsonPath("$.creditCard.holderName").value("DANIEL S S PAULA"))
                 .andRespond(withSuccess(expectedJsonResponse, MediaType.APPLICATION_JSON));
 
@@ -317,7 +318,7 @@ class AsaasPaymentAdapterTest {
                 .andExpect(jsonPath("$.customer").value("cus_123"))
                 .andRespond(withSuccess(subscriptionJsonResponse, MediaType.APPLICATION_JSON));
 
-        mockServer.expect(requestTo(API_URL + "/payments?subscription=sub_pix123"))
+        mockServer.expect(requestTo(API_URL + "/payments?subscription=sub_pix123&status=PENDING"))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess(paymentsJsonResponse, MediaType.APPLICATION_JSON));
 

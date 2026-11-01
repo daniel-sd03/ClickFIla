@@ -117,6 +117,7 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("billingType", paymentMethod.name());
         requestBody.put("remoteIp", getClientIpAddress());
+        requestBody.put("updatePendingPayments", true);
 
         if (paymentMethod == PaymentMethod.CREDIT_CARD) {
             if (creditCard != null && holderInfo != null) {
@@ -297,17 +298,14 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
     @SuppressWarnings("unchecked")
     private CheckoutResponseDTO fetchPixQrCodeFromSubscription(String subscriptionId) {
         var paymentsResponse = restClient.get()
-                .uri("/payments?subscription=" + subscriptionId)
+                .uri("/payments?subscription=" + subscriptionId + "&status=PENDING")
                 .retrieve()
                 .body(Map.class);
 
         List<Map<String, Object>> payments = (List<Map<String, Object>>) paymentsResponse.get("data");
+
         if (payments == null || payments.isEmpty()) {
-            throw new AppException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    "GATEWAY_ERROR",
-                    "No invoice found for this PIX subscription."
-            );
+            return null;
         }
 
         String firstPaymentId = (String) payments.get(0).get("id");
@@ -315,14 +313,17 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
         var pixResponse = restClient.get()
                 .uri("/payments/{id}/pixQrCode", firstPaymentId)
                 .retrieve()
+                .onStatus(status -> status.is4xxClientError(), (req, res) -> {
+                    throw new AppException(
+                            HttpStatus.BAD_REQUEST,
+                            "PIX_NOT_ALLOWED",
+                            "Unable to generate PIX for this charge."
+                    );
+                })
                 .body(Map.class);
 
         if (pixResponse == null || !pixResponse.containsKey("payload")) {
-            throw new AppException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    "GATEWAY_ERROR",
-                    "Failed to retrieve PIX QR Code."
-            );
+            return null;
         }
 
         return new CheckoutResponseDTO(
