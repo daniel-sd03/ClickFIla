@@ -37,7 +37,6 @@ public class DashboardService {
     private final QueueCacheService queueCacheService;
     private final TeamInviteRepository teamInviteRepository;
     private final SubscriptionRepository subscriptionRepository;
-    private final UserRepository userRepository;
 
     private record SubInfo(SubscriptionStatus status, LocalDate end) {}
 

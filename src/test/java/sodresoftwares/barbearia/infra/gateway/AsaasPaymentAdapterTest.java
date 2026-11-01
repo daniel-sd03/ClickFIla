@@ -148,7 +148,8 @@ class AsaasPaymentAdapterTest {
                 .andExpect(jsonPath("$.creditCardHolderInfo.cpfCnpj").value("12345678909"))
                 .andRespond(withSuccess(expectedJsonResponse, MediaType.APPLICATION_JSON));
 
-        GatewayCreditCardResponse response = adapter.processCreditCardCheckout(testBusiness, testPlan, "cus_123", testCreditCard, testHolder);
+        GatewayCreditCardResponse response = adapter.processCreditCardCheckout(
+                testBusiness, testPlan, "cus_123", null, testCreditCard, testHolder);
 
         assertThat(response).isNotNull();
         assertThat(response.gatewaySubscriptionId()).isEqualTo("sub_123");
@@ -163,7 +164,8 @@ class AsaasPaymentAdapterTest {
         mockServer.expect(requestTo(API_URL + "/subscriptions"))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST));
 
-        assertThatThrownBy(() -> adapter.processCreditCardCheckout(testBusiness, testPlan, "cus_123", testCreditCard, testHolder))
+        assertThatThrownBy(() -> adapter.processCreditCardCheckout(
+                testBusiness, testPlan, "cus_123", null, testCreditCard, testHolder))
                 .isInstanceOf(AppException.class)
                 .hasMessage("The card was declined or the provided data is invalid. Please check the information and try again.")
                 .extracting(e -> ((AppException) e).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -194,7 +196,7 @@ class AsaasPaymentAdapterTest {
                 .andRespond(withSuccess(expectedJsonResponse, MediaType.APPLICATION_JSON));
 
         GatewayCreditCardResponse response = adapter.updateSubscriptionPaymentMethod(
-                gatewaySubscriptionId, PaymentMethod.CREDIT_CARD, testCreditCard, testHolder
+                gatewaySubscriptionId, PaymentMethod.CREDIT_CARD, null, testCreditCard, testHolder
         );
 
         assertThat(response).isNotNull();

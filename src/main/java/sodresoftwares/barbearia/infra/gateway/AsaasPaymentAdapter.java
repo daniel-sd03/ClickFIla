@@ -68,6 +68,7 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
             Business business,
             @NonNull Plan plan,
             String gatewayCustomerId,
+            String creditCardToken,
             CreditCardDTO creditCard,
             CreditCardHolderDTO holderInfo) {
 
@@ -81,41 +82,49 @@ public class AsaasPaymentAdapter implements PaymentGatewayPort {
             );
         };
 
-        var requestBody = Map.of(
-                "customer", gatewayCustomerId,
-                "billingType", PaymentMethod.CREDIT_CARD.name(),
-                "value", plan.getPrice(),
-                "nextDueDate", LocalDate.now().toString(),
-                "cycle", cycle,
-                "description", plan.getCode(),
-                "externalReference", business.getId(),
-                "creditCard", buildCreditCardPayload(creditCard),
-                "creditCardHolderInfo", buildHolderPayload(holderInfo),
-                "remoteIp", getClientIpAddress()
-        );
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("customer", gatewayCustomerId);
+        requestBody.put("billingType", PaymentMethod.CREDIT_CARD.name());
+        requestBody.put("value", plan.getPrice());
+        requestBody.put("nextDueDate", LocalDate.now().toString());
+        requestBody.put("cycle", cycle);
+        requestBody.put("description", plan.getCode());
+        requestBody.put("externalReference", business.getId());
+        requestBody.put("remoteIp", getClientIpAddress());
+
+        if (creditCard != null && holderInfo != null) {
+            requestBody.put("creditCard", buildCreditCardPayload(creditCard));
+            requestBody.put("creditCardHolderInfo", buildHolderPayload(holderInfo));
+        } else if (creditCardToken != null) {
+            requestBody.put("creditCardToken", creditCardToken);
+        }
 
         return sendSubscriptionRequest(
                 HttpMethod.POST,
                 "/subscriptions",
                 null, requestBody,
-                "The card was declined or the provided data is invalid. Please check the information and try again."
-        );
+                "The card was declined or the provided data is invalid. Please check the information and try again.");
     }
 
     @Override
     public GatewayCreditCardResponse updateSubscriptionPaymentMethod(
             String gatewaySubscriptionId,
             PaymentMethod paymentMethod,
+            String creditCardToken,
             CreditCardDTO creditCard,
             CreditCardHolderDTO holderInfo) {
 
-        Map<String, Object> requestBody = new java.util.HashMap<>();
+        Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("billingType", paymentMethod.name());
         requestBody.put("remoteIp", getClientIpAddress());
 
         if (paymentMethod == PaymentMethod.CREDIT_CARD) {
-            requestBody.put("creditCard", buildCreditCardPayload(creditCard));
-            requestBody.put("creditCardHolderInfo", buildHolderPayload(holderInfo));
+            if (creditCard != null && holderInfo != null) {
+                requestBody.put("creditCard", buildCreditCardPayload(creditCard));
+                requestBody.put("creditCardHolderInfo", buildHolderPayload(holderInfo));
+            } else if (creditCardToken != null) {
+                requestBody.put("creditCardToken", creditCardToken);
+            }
         }
 
         return sendSubscriptionRequest(
