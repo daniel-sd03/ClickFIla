@@ -402,14 +402,24 @@ class QueueEntryServiceTest {
     // ==================== CALL NEXT TESTS ====================
 
     @Test
-    @DisplayName("Should successfully call next waiting client and link the member serving")
+    @DisplayName("Should successfully call next waiting client, link member and notify the future next")
     void testCallNext_Success() {
         // Arrange
+        User nextClientUser = User.builder().id("next-client-123").build();
+        QueueEntry nextWaitingEntry = QueueEntry.builder()
+                .id("entry-456")
+                .status(QueueEntryStatus.WAITING)
+                .user(nextClientUser)
+                .build();
+
         when(queueSessionRepository.findByIdWithBusinessAndUser(SESSION_ID)).thenReturn(Optional.of(activeSession));
         when(teamMemberRepository.findById(teamMember.getId())).thenReturn(Optional.of(teamMember));
-        when(queueEntryRepository.existsByServedByMemberIdAndStatusIn(eq(teamMember.getId()), anyList())).thenReturn(false);
-        when(queueEntryRepository.save(any(QueueEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(queueEntryRepository.findActiveEntriesBySessionId(SESSION_ID)).thenReturn(List.of(waitingEntry));
+        when(queueEntryRepository.existsByServedByMemberIdAndStatusIn(eq(teamMember.getId()), anyList())).
+                thenReturn(false);
+        when(queueEntryRepository.save(any(QueueEntry.class))).thenAnswer(invocation ->
+                invocation.getArgument(0));
+        when(queueEntryRepository.findActiveEntriesBySessionId(SESSION_ID)).thenReturn(List.of(waitingEntry,
+                nextWaitingEntry));
 
         // Act
         QueueEntryResponseDTO response = queueEntryService.callNext(SESSION_ID, BARBER_USER_ID, teamMember.getId());
@@ -423,6 +433,7 @@ class QueueEntryServiceTest {
         verify(queueEntryRepository).save(waitingEntry);
         verify(queueCacheService).evictSessionList(SESSION_ID);
         verify(pushDispatcher).notifyClientTurn(waitingEntry.getUser().getId(), teamMember.getName());
+        verify(pushDispatcher).notifyPrepareYourself("next-client-123");
     }
 
     @Test

@@ -19,6 +19,12 @@ public class PushNotificationDispatcher {
     private final UserPushSubscriptionRepository pushRepository;
     private final WebPushService webPushService;
 
+    public void notifyPrepareYourself(String userId) {
+        String title = "Fique atento! 👀";
+        String message = "Você é o próximo da fila. Vá se preparando para o atendimento.";
+        notifyUser(userId, title, message);
+    }
+
     public void notifyClientTurn(String userId, String attendantOrPlaceName) {
         String title = "É a sua vez! 🎉";
         String message = "Chegou a sua vez na fila! Dirija-se ao local de atendimento ("

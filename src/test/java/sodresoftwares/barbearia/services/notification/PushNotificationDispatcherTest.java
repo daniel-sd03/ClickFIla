@@ -47,6 +47,30 @@ class PushNotificationDispatcherTest {
                 .build();
     }
 
+    // ==================== NOTIFY PREPARE YOURSELF ====================
+
+    @Test
+    @DisplayName("Should format prepare yourself message and delegate to notifyUser")
+    void testNotifyPrepareYourself() {
+        // Arrange
+        when(pushRepository.findAllByUserId(USER_ID)).thenReturn(List.of(subscription1));
+
+        String expectedTitle = "Fique atento! 👀";
+        String expectedMessage = "Você é o próximo da fila. Vá se preparando para o atendimento.";
+        String expectedJson = """
+                {
+                    "title": "%s",
+                    "body": "%s"
+                }
+                """.formatted(expectedTitle, expectedMessage);
+
+        // Act
+        dispatcher.notifyPrepareYourself(USER_ID);
+
+        // Assert
+        verify(webPushService).sendPushNotification("endpoint-1", "p256dh-1", "auth-1", expectedJson);
+    }
+
     // ==================== NOTIFY CLIENT TURN ====================
 
     @Test
